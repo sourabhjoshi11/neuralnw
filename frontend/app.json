@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "ClassChaos",
+    "slug": "classchaos",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "classchaos",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0e1a"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.classchaos.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Required for dare verification",
+        "NSPhotoLibraryUsageDescription": "Required to save leaderboard screenshots"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0a0e1a"
+      },
+      "package": "com.classchaos.app",
+      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE", "VIBRATE"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-haptics",
+      [
+        "expo-screen-capture",
+        {
+          "preventScreenCapture": true
+        }
+      ],
+      [
+        "react-native-reanimated"
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

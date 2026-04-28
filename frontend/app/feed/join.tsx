@@ -1,0 +1,116 @@
+import { useState } from 'react';
+import { View, Text, TextInput, Pressable, SafeAreaView, Alert } from 'react-native';
+import { router } from 'expo-router';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, BorderRadius, SpringConfig } from '@/constants/theme';
+import { useAuthStore } from '@/store/authStore';
+import { useFeedStore } from '@/store/feedStore';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
+
+export default function JoinFeedScreen() {
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { token } = useAuthStore();
+  const { setFeed } = useFeedStore();
+  const scale = useSharedValue(1);
+  const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  const isValid = code.trim().length === 8;
+
+  const handleJoin = async () => {
+    if (!isValid || loading) return;
+    setLoading(true);
+    try {
+      const resp = await fetch(`${API_URL}/feed/feeds/${code.trim()}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        Alert.alert('Error', data.detail ?? 'Feed not found');
+        return;
+      }
+      setFeed(data.feed);
+      router.push(`/feed/${data.feed.code}`);
+    } catch {
+      Alert.alert('Error', 'Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg.primary }}>
+      <View style={{ flex: 1, padding: 20, gap: 28, justifyContent: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Pressable onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={Colors.text.secondary} />
+          </Pressable>
+          <Text style={{ color: Colors.text.primary, fontSize: 24, fontFamily: 'Syne_900Black' }}>
+            Join Class Feed
+          </Text>
+        </View>
+
+        <View style={{ gap: 12 }}>
+          <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
+            Enter the 8-character feed code
+          </Text>
+          <TextInput
+            style={{
+              backgroundColor: Colors.bg.card,
+              borderRadius: BorderRadius.input,
+              borderWidth: 1,
+              borderColor: code ? 'rgba(6,182,212,0.4)' : 'rgba(255,255,255,0.07)',
+              color: Colors.text.primary,
+              fontSize: 24,
+              fontFamily: 'Inter_700Bold',
+              paddingHorizontal: 20,
+              paddingVertical: 16,
+              textAlign: 'center',
+              letterSpacing: 4,
+            }}
+            placeholder="ABC12345"
+            placeholderTextColor={Colors.text.muted}
+            maxLength={8}
+            value={code}
+            onChangeText={(v) => setCode(v.toUpperCase())}
+            autoFocus
+            autoCapitalize="characters"
+          />
+        </View>
+
+        <Pressable
+          onPress={handleJoin}
+          onPressIn={() => { scale.value = withSpring(0.95, SpringConfig.snappy); }}
+          onPressOut={() => { scale.value = withSpring(1, SpringConfig.default); }}
+          disabled={!isValid || loading}
+        >
+          <Animated.View style={btnStyle}>
+            <LinearGradient
+              colors={isValid ? ['#06b6d4', '#8b5cf6'] : ['#1a2235', '#1a2235']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                paddingVertical: 16,
+                borderRadius: BorderRadius.btn,
+                alignItems: 'center',
+                shadowColor: '#06b6d4',
+                shadowOpacity: isValid ? 0.4 : 0,
+                shadowRadius: 20,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: isValid ? 8 : 0,
+              }}
+            >
+              <Text style={{ color: isValid ? '#fff' : Colors.text.muted, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>
+                {loading ? 'Joining...' : 'Join Feed →'}
+              </Text>
+            </LinearGradient>
+          </Animated.View>
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  );
+}
