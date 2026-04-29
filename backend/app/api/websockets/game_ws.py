@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decode_access_token
 from app.models.game import AnonPlayer, Room
 from app.models.user import User
+from app.services import game_engine
 from app.services.room_manager import room_manager
 
 
@@ -49,7 +50,14 @@ async def game_ws_handler(ws: WebSocket, room_code: str, db: AsyncSession) -> No
     await ws.accept()
     room_manager.connect(room_code, player.id, ws)
 
-    # Notify others of reconnect/join
+    # Send full state snapshot to the connecting client for reconnect
+    try:
+        state = await game_engine.get_room_state(room_code, db)
+        await ws.send_text(json.dumps({"type": "state_sync", "data": state}))
+    except Exception:
+        pass
+
+    # Notify others of join/reconnect
     await room_manager.broadcast(
         room_code,
         {

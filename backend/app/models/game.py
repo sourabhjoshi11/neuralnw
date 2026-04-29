@@ -22,6 +22,7 @@ class Room(Base):
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     current_turn_player_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    current_phase: Mapped[str] = mapped_column(String(30), default="lobby")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -66,4 +67,35 @@ class GameRound(Base):
     answer: Mapped[str | None] = mapped_column(Text, nullable=True)
     phase: Mapped[str] = mapped_column(String(30), default="spinning")
     phase_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    dare_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Vote(Base):
+    __tablename__ = "votes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    round_id: Mapped[str] = mapped_column(String(36), ForeignKey("game_rounds.id"), nullable=False, index=True)
+    player_id: Mapped[str] = mapped_column(String(36), ForeignKey("anon_players.id"), nullable=False)
+    value: Mapped[str] = mapped_column(String(5), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Reaction(Base):
+    __tablename__ = "reactions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    round_id: Mapped[str] = mapped_column(String(36), ForeignKey("game_rounds.id"), nullable=False, index=True)
+    player_id: Mapped[str] = mapped_column(String(36), ForeignKey("anon_players.id"), nullable=False)
+    emoji: Mapped[str] = mapped_column(String(4), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    round_id: Mapped[str] = mapped_column(String(36), ForeignKey("game_rounds.id"), nullable=False, index=True)
+    player_id: Mapped[str] = mapped_column(String(36), ForeignKey("anon_players.id"), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
