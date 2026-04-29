@@ -4,137 +4,133 @@ import { router } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withRepeat,
-  withTiming,
   withSpring,
-  interpolate,
+  withDelay,
+  withTiming,
+  withRepeat,
+  withSequence,
   Easing,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import { AnimatedWheel } from '@/components/ui/AnimatedWheel';
 import { Colors, SpringConfig } from '@/constants/theme';
 
 const { width, height } = Dimensions.get('window');
 
-const FLOATING_EMOJIS = ['📚', '✏️', '💤', '😂', '🎯', '📱'];
+const FLOATING = [
+  { emoji: '📚', x: 0.08 },
+  { emoji: '✏️', x: 0.25 },
+  { emoji: '💤', x: 0.45 },
+  { emoji: '😂', x: 0.62 },
+  { emoji: '🎯', x: 0.78 },
+  { emoji: '📱', x: 0.91 },
+];
 
-function FloatingEmoji({ emoji, delay, x }: { emoji: string; delay: number; x: number }) {
-  const translateY = useSharedValue(height * 0.9);
+const AVATAR_EMOJIS = ['🧑', '👩', '🧑', '👦'];
+
+function FloatingEmoji({ emoji, x, delay }: { emoji: string; x: number; delay: number }) {
+  const translateY = useSharedValue(height);
   const opacity = useSharedValue(0);
 
   useEffect(() => {
-    const start = () => {
-      translateY.value = height * 0.9;
+    const loop = () => {
+      translateY.value = height * 0.8 + Math.random() * height * 0.2;
       opacity.value = 0;
+
       setTimeout(() => {
-        translateY.value = withTiming(-80, { duration: 8000, easing: Easing.linear });
-        opacity.value = withTiming(1, { duration: 500 }, () => {
-          opacity.value = withTiming(0, { duration: 500, easing: Easing.in(Easing.ease) });
-        });
-        setTimeout(start, 8000 + Math.random() * 4000);
+        translateY.value = withTiming(-60, { duration: 7000 + Math.random() * 3000, easing: Easing.linear });
+        opacity.value = withSequence(
+          withTiming(0.7, { duration: 600 }),
+          withDelay(5000, withTiming(0, { duration: 800 })),
+        );
+        setTimeout(loop, 9000 + Math.random() * 4000);
       }, delay);
     };
-    start();
+    loop();
   }, []);
 
-  const animStyle = useAnimatedStyle(() => ({
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: x * width,
     transform: [{ translateY: translateY.value }],
     opacity: opacity.value,
-    position: 'absolute',
-    left: x,
-    fontSize: 24,
   }));
-
-  return <Animated.Text style={animStyle}>{emoji}</Animated.Text>;
-}
-
-function AnimatedWheel() {
-  const rotation = useSharedValue(0);
-
-  useEffect(() => {
-    rotation.value = withRepeat(
-      withTiming(360, { duration: 8000, easing: Easing.linear }),
-      -1,
-      false
-    );
-  }, []);
-
-  const wheelStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
-
-  const SLICE_COLORS = ['#3b82f6', '#06b6d4', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b'];
-  const SIZE = 200;
-  const CENTER = SIZE / 2;
-  const RADIUS = SIZE / 2 - 4;
 
   return (
-    <Animated.View style={[{ width: SIZE, height: SIZE }, wheelStyle]}>
-      <View style={{ width: SIZE, height: SIZE, borderRadius: SIZE / 2, overflow: 'hidden', position: 'relative' }}>
-        {SLICE_COLORS.map((color, i) => {
-          const angle = (360 / 6) * i;
-          return (
-            <View
-              key={i}
-              style={{
-                position: 'absolute',
-                width: '100%',
-                height: '100%',
-                borderRadius: SIZE / 2,
-                overflow: 'hidden',
-                transform: [{ rotate: `${angle}deg` }],
-              }}
-            >
-              <View
-                style={{
-                  width: '50%',
-                  height: '100%',
-                  backgroundColor: color,
-                  transformOrigin: 'right center',
-                  transform: [{ rotate: '30deg' }],
-                  position: 'absolute',
-                  right: 0,
-                }}
-              />
-            </View>
-          );
-        })}
+    <Animated.View style={style}>
+      <Text style={{ fontSize: 22 }}>{emoji}</Text>
+    </Animated.View>
+  );
+}
+
+function SocialProof() {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      {AVATAR_EMOJIS.map((emoji, i) => (
         <View
+          key={i}
           style={{
-            position: 'absolute',
-            width: 48,
-            height: 48,
-            borderRadius: 24,
-            backgroundColor: '#0a0e1a',
-            top: CENTER - 24,
-            left: CENTER - 24,
-            zIndex: 10,
+            width: 30,
+            height: 30,
+            borderRadius: 15,
+            backgroundColor: '#1a2235',
             alignItems: 'center',
             justifyContent: 'center',
+            marginLeft: i > 0 ? -10 : 0,
+            borderWidth: 2,
+            borderColor: '#050810',
+            zIndex: AVATAR_EMOJIS.length - i,
           }}
         >
-          <Text style={{ fontSize: 24 }}>🍾</Text>
+          <Text style={{ fontSize: 14 }}>{emoji}</Text>
         </View>
+      ))}
+      <View
+        style={{
+          backgroundColor: 'rgba(59,130,246,0.15)',
+          borderRadius: 20,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderWidth: 1,
+          borderColor: 'rgba(59,130,246,0.3)',
+          marginLeft: 4,
+        }}
+      >
+        <Text style={{ color: Colors.blue, fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>
+          2400+ playing
+        </Text>
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
 function PrimaryButton({ label, onPress }: { label: string; onPress: () => void }) {
   const scale = useSharedValue(1);
+  const shimmer = useSharedValue(0);
 
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  useEffect(() => {
+    shimmer.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1500 }),
+        withTiming(0, { duration: 1500 }),
+      ),
+      -1,
+    );
+  }, []);
 
-  const handlePressIn = () => {
-    scale.value = withSpring(0.95, SpringConfig.snappy);
-  };
-  const handlePressOut = () => {
-    scale.value = withSpring(1, SpringConfig.default);
-  };
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
-    <Pressable onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        onPress();
+      }}
+      onPressIn={() => { scale.value = withSpring(0.95, SpringConfig.snappy); }}
+      onPressOut={() => { scale.value = withSpring(1, SpringConfig.default); }}
+      style={{ width: '100%' }}
+    >
       <Animated.View style={animStyle}>
         <LinearGradient
           colors={['#3b82f6', '#06b6d4']}
@@ -142,23 +138,16 @@ function PrimaryButton({ label, onPress }: { label: string; onPress: () => void 
           end={{ x: 1, y: 1 }}
           style={{
             paddingVertical: 16,
-            paddingHorizontal: 48,
             borderRadius: 18,
+            alignItems: 'center',
             shadowColor: '#3b82f6',
-            shadowOpacity: 0.4,
-            shadowRadius: 20,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 8,
+            shadowOpacity: 0.5,
+            shadowRadius: 24,
+            shadowOffset: { width: 0, height: 6 },
+            elevation: 10,
           }}
         >
-          <Text
-            style={{
-              color: '#fff',
-              fontSize: 16,
-              fontFamily: 'Syne_800ExtraBold',
-              textAlign: 'center',
-            }}
-          >
+          <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>
             {label}
           </Text>
         </LinearGradient>
@@ -168,113 +157,113 @@ function PrimaryButton({ label, onPress }: { label: string; onPress: () => void 
 }
 
 export default function LandingScreen() {
+  const wheelOpacity = useSharedValue(0);
+  const wheelScale = useSharedValue(0.7);
+  const titleY = useSharedValue(40);
   const titleOpacity = useSharedValue(0);
-  const titleY = useSharedValue(30);
   const taglineOpacity = useSharedValue(0);
-  const buttonOpacity = useSharedValue(0);
+  const proofOpacity = useSharedValue(0);
+  const buttonsY = useSharedValue(30);
+  const buttonsOpacity = useSharedValue(0);
 
   useEffect(() => {
-    setTimeout(() => {
-      titleOpacity.value = withSpring(1, SpringConfig.gentle);
-      titleY.value = withSpring(0, SpringConfig.default);
-    }, 300);
-    setTimeout(() => {
-      taglineOpacity.value = withSpring(1, SpringConfig.gentle);
-    }, 700);
-    setTimeout(() => {
-      buttonOpacity.value = withSpring(1, SpringConfig.gentle);
-    }, 1000);
+    // Staggered entrance sequence
+    wheelOpacity.value = withSpring(1, SpringConfig.gentle);
+    wheelScale.value = withSpring(1, SpringConfig.default);
+
+    titleOpacity.value = withDelay(300, withSpring(1, SpringConfig.gentle));
+    titleY.value = withDelay(300, withSpring(0, SpringConfig.default));
+
+    taglineOpacity.value = withDelay(550, withSpring(1, SpringConfig.gentle));
+    proofOpacity.value = withDelay(750, withSpring(1, SpringConfig.gentle));
+
+    buttonsOpacity.value = withDelay(950, withSpring(1, SpringConfig.gentle));
+    buttonsY.value = withDelay(950, withSpring(0, SpringConfig.default));
   }, []);
 
+  const wheelStyle = useAnimatedStyle(() => ({
+    opacity: wheelOpacity.value,
+    transform: [{ scale: wheelScale.value }],
+  }));
   const titleStyle = useAnimatedStyle(() => ({
     opacity: titleOpacity.value,
     transform: [{ translateY: titleY.value }],
   }));
   const taglineStyle = useAnimatedStyle(() => ({ opacity: taglineOpacity.value }));
-  const buttonStyle = useAnimatedStyle(() => ({ opacity: buttonOpacity.value }));
+  const proofStyle = useAnimatedStyle(() => ({ opacity: proofOpacity.value }));
+  const buttonsStyle = useAnimatedStyle(() => ({
+    opacity: buttonsOpacity.value,
+    transform: [{ translateY: buttonsY.value }],
+  }));
 
   return (
     <View style={{ flex: 1, backgroundColor: '#050810', alignItems: 'center' }}>
-      {FLOATING_EMOJIS.map((emoji, i) => (
-        <FloatingEmoji
-          key={i}
-          emoji={emoji}
-          delay={i * 1200}
-          x={40 + (i * (width - 80)) / (FLOATING_EMOJIS.length - 1)}
-        />
+      {/* Floating classroom emojis */}
+      {FLOATING.map((item, i) => (
+        <FloatingEmoji key={i} emoji={item.emoji} x={item.x} delay={i * 1000} />
       ))}
 
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 32 }}>
-        <AnimatedWheel />
+      {/* Subtle radial glow behind wheel */}
+      <View
+        style={{
+          position: 'absolute',
+          top: height * 0.12,
+          width: 280,
+          height: 280,
+          borderRadius: 140,
+          backgroundColor: 'rgba(59,130,246,0.08)',
+        }}
+      />
 
-        <Animated.View style={[{ alignItems: 'center', gap: 8 }, titleStyle]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ color: '#f1f5f9', fontSize: 48, fontFamily: 'Syne_900Black' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 28, paddingHorizontal: 28 }}>
+        {/* Wheel */}
+        <Animated.View style={wheelStyle}>
+          <AnimatedWheel size={220} duration={9000} />
+        </Animated.View>
+
+        {/* Wordmark */}
+        <Animated.View style={[{ alignItems: 'center', gap: 10 }, titleStyle]}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+            <Text style={{ color: '#f1f5f9', fontSize: 46, fontFamily: 'Syne_900Black', letterSpacing: -1 }}>
               Class
             </Text>
-            <Text
-              style={{
-                fontSize: 48,
-                fontFamily: 'Syne_900Black',
-                color: '#3b82f6',
-              }}
-            >
+            <Text style={{ fontSize: 46, fontFamily: 'Syne_900Black', color: '#3b82f6', letterSpacing: -1 }}>
               CHAOS
             </Text>
           </View>
-          <Animated.View style={taglineStyle}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ height: 1, width: 40, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-              <Text
-                style={{
-                  color: '#94a3b8',
-                  fontSize: 14,
-                  fontFamily: 'Inter_400Regular',
-                  textAlign: 'center',
-                }}
-              >
+
+          <Animated.View style={[{ alignItems: 'center', gap: 6 }, taglineStyle]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ height: 1, width: 36, backgroundColor: 'rgba(255,255,255,0.15)' }} />
+              <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
                 Turn boring lectures into chaos
               </Text>
-              <View style={{ height: 1, width: 40, backgroundColor: 'rgba(255,255,255,0.2)' }} />
+              <View style={{ height: 1, width: 36, backgroundColor: 'rgba(255,255,255,0.15)' }} />
             </View>
           </Animated.View>
         </Animated.View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          {['🧑', '👩', '🧑', '👦'].map((emoji, i) => (
-            <View
-              key={i}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: '#1a2235',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginLeft: i > 0 ? -10 : 0,
-                borderWidth: 2,
-                borderColor: '#050810',
-              }}
-            >
-              <Text style={{ fontSize: 16 }}>{emoji}</Text>
-            </View>
-          ))}
-          <Text style={{ color: '#94a3b8', fontSize: 12, fontFamily: 'Inter_500Medium', marginLeft: 8 }}>
-            2400+ playing
-          </Text>
-        </View>
+        {/* Social proof */}
+        <Animated.View style={proofStyle}>
+          <SocialProof />
+        </Animated.View>
 
-        <Animated.View style={[{ width: '80%', gap: 12, alignItems: 'center' }, buttonStyle]}>
-          <PrimaryButton label="Get Started 🎲" onPress={() => router.push('/(auth)/phone')} />
-          <Pressable onPress={() => router.push('/(auth)/phone')}>
-            <Text
-              style={{
-                color: '#94a3b8',
-                fontSize: 14,
-                fontFamily: 'Inter_600SemiBold',
-              }}
-            >
-              Already have an account? Sign in
+        {/* CTA buttons */}
+        <Animated.View style={[{ width: '100%', gap: 12 }, buttonsStyle]}>
+          <PrimaryButton
+            label="Get Started 🎲"
+            onPress={() => router.push('/(auth)/phone')}
+          />
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync();
+              router.push('/(auth)/phone');
+            }}
+            style={{ alignItems: 'center', paddingVertical: 8 }}
+          >
+            <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Inter_500Medium' }}>
+              Already have an account?{' '}
+              <Text style={{ color: Colors.blue, fontFamily: 'Inter_600SemiBold' }}>Sign in</Text>
             </Text>
           </Pressable>
         </Animated.View>

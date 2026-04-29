@@ -1,8 +1,14 @@
 import { Redirect, Tabs } from 'expo-router';
-import { View, Text } from 'react-native';
+import { Pressable, View, Text } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '@/store/authStore';
-import { Colors } from '@/constants/theme';
+import { Colors, SpringConfig } from '@/constants/theme';
 
 type TabIconProps = {
   name: keyof typeof Ionicons.glyphMap;
@@ -11,9 +17,27 @@ type TabIconProps = {
 };
 
 function TabIcon({ name, focused, label }: TabIconProps) {
+  const scale = useSharedValue(1);
+  const indicatorOpacity = useSharedValue(focused ? 1 : 0);
+
+  const scaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const dotStyle = useAnimatedStyle(() => ({ opacity: indicatorOpacity.value }));
+
+  // Bounce on focus
+  if (focused) {
+    scale.value = withSpring(1.15, SpringConfig.snappy, () => {
+      scale.value = withSpring(1, SpringConfig.default);
+    });
+    indicatorOpacity.value = withSpring(1, SpringConfig.gentle);
+  } else {
+    indicatorOpacity.value = withSpring(0, SpringConfig.gentle);
+  }
+
   return (
-    <View style={{ alignItems: 'center', gap: 2 }}>
-      <Ionicons name={name} size={22} color={focused ? Colors.blue : Colors.text.muted} />
+    <View style={{ alignItems: 'center', gap: 3 }}>
+      <Animated.View style={scaleStyle}>
+        <Ionicons name={name} size={22} color={focused ? Colors.blue : Colors.text.muted} />
+      </Animated.View>
       <Text
         style={{
           fontSize: 10,
@@ -23,6 +47,18 @@ function TabIcon({ name, focused, label }: TabIconProps) {
       >
         {label}
       </Text>
+      <Animated.View
+        style={[
+          {
+            width: 4,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: Colors.blue,
+            marginTop: 1,
+          },
+          dotStyle,
+        ]}
+      />
     </View>
   );
 }
@@ -30,7 +66,6 @@ function TabIcon({ name, focused, label }: TabIconProps) {
 export default function TabsLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
-  // Not logged in — send to auth
   if (!isAuthenticated) {
     return <Redirect href="/(auth)/landing" />;
   }
@@ -43,11 +78,20 @@ export default function TabsLayout() {
           backgroundColor: '#1a2235',
           borderTopWidth: 1,
           borderTopColor: 'rgba(255,255,255,0.05)',
-          height: 60,
-          paddingBottom: 8,
+          height: 68,
+          paddingBottom: 10,
           paddingTop: 8,
         },
         tabBarShowLabel: false,
+        tabBarButton: (props) => (
+          <Pressable
+            {...props}
+            onPress={(e) => {
+              Haptics.selectionAsync();
+              props.onPress?.(e);
+            }}
+          />
+        ),
       }}
     >
       <Tabs.Screen

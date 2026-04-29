@@ -8,193 +8,304 @@ import Animated, {
   withDelay,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import { Card, Badge, GradientButton } from '@/components/ui';
 import { Colors, BorderRadius, SpringConfig } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 
-const ANON_EMOJIS = ['🦊', '🐼', '🦁', '🐸', '🐯', '🦄', '🐙', '🦋'];
+const ANON_AVATARS = ['🦊', '🐼', '🦁', '🐸', '🐯', '🦄', '🐙', '🦋', '🐧', '🦝'];
+
+function useStaggeredEntrance(count: number, baseDelay = 80) {
+  const values = Array.from({ length: count }, () => ({
+    opacity: useSharedValue(0),
+    translateY: useSharedValue(30),
+  }));
+
+  useEffect(() => {
+    values.forEach((v, i) => {
+      const delay = i * baseDelay;
+      v.opacity.value = withDelay(delay, withSpring(1, SpringConfig.gentle));
+      v.translateY.value = withDelay(delay, withSpring(0, SpringConfig.default));
+    });
+  }, []);
+
+  return values.map((v) =>
+    useAnimatedStyle(() => ({
+      opacity: v.opacity.value,
+      transform: [{ translateY: v.translateY.value }],
+    }))
+  );
+}
+
+type GameCardProps = {
+  emoji: string;
+  title: string;
+  subtitle: string;
+  badge: string;
+  badgeColor: string;
+  gradientColors: [string, string];
+  animStyle: ReturnType<typeof useAnimatedStyle>;
+  onPress: () => void;
+  onPressSecondary?: { label: string; onPress: () => void };
+};
 
 function GameCard({
   emoji,
   title,
   subtitle,
   badge,
-  accentColor,
-  delay,
+  badgeColor,
+  gradientColors,
+  animStyle,
   onPress,
-}: {
-  emoji: string;
-  title: string;
-  subtitle: string;
-  badge: string;
-  accentColor: string;
-  delay: number;
-  onPress: () => void;
-}) {
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(40);
+  onPressSecondary,
+}: GameCardProps) {
   const scale = useSharedValue(1);
-
-  useEffect(() => {
-    opacity.value = withDelay(delay, withSpring(1, SpringConfig.gentle));
-    translateY.value = withDelay(delay, withSpring(0, SpringConfig.default));
-  }, []);
-
-  const cardStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }, { scale: scale.value }],
+  const cardPressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
   }));
 
   return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={() => { scale.value = withSpring(0.97, SpringConfig.snappy); }}
-      onPressOut={() => { scale.value = withSpring(1, SpringConfig.default); }}
-    >
-      <Animated.View
-        style={[
-          {
-            backgroundColor: Colors.bg.card,
-            borderRadius: BorderRadius.card,
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.06)',
-            overflow: 'hidden',
-          },
-          cardStyle,
-        ]}
+    <Animated.View style={animStyle}>
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onPress();
+        }}
+        onPressIn={() => { scale.value = withSpring(0.97, SpringConfig.snappy); }}
+        onPressOut={() => { scale.value = withSpring(1, SpringConfig.default); }}
       >
-        <LinearGradient
-          colors={['#3b82f6', '#06b6d4']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={{ height: 2 }}
-        />
-        <View style={{ padding: 20, gap: 12 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <Text style={{ fontSize: 36 }}>{emoji}</Text>
-            <View
-              style={{
-                backgroundColor: `${accentColor}20`,
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                borderRadius: 20,
-                borderWidth: 1,
-                borderColor: `${accentColor}40`,
-              }}
+        <Animated.View style={cardPressStyle}>
+          <Card accentGradient={false} padding={0} style={{ overflow: 'hidden' }}>
+            <LinearGradient
+              colors={[`${gradientColors[0]}22`, `${gradientColors[1]}11`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ padding: 20, gap: 14 }}
             >
-              <Text style={{ color: accentColor, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
-                {badge}
-              </Text>
-            </View>
-          </View>
-          <View style={{ gap: 4 }}>
-            <Text style={{ color: Colors.text.primary, fontSize: 20, fontFamily: 'Syne_800ExtraBold' }}>
-              {title}
-            </Text>
-            <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
-              {subtitle}
-            </Text>
-          </View>
-        </View>
-      </Animated.View>
-    </Pressable>
+              {/* Top accent */}
+              <LinearGradient
+                colors={gradientColors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ height: 2, position: 'absolute', top: 0, left: 0, right: 0 }}
+              />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Text style={{ fontSize: 38 }}>{emoji}</Text>
+                <Badge label={badge} color={badgeColor} />
+              </View>
+
+              <View style={{ gap: 4 }}>
+                <Text style={{ color: Colors.text.primary, fontSize: 20, fontFamily: 'Syne_800ExtraBold' }}>
+                  {title}
+                </Text>
+                <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 }}>
+                  {subtitle}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <Pressable
+                  style={{ flex: 1 }}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    onPress();
+                  }}
+                >
+                  <LinearGradient
+                    colors={gradientColors}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      shadowColor: gradientColors[0],
+                      shadowOpacity: 0.35,
+                      shadowRadius: 12,
+                      shadowOffset: { width: 0, height: 3 },
+                      elevation: 6,
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 13, fontFamily: 'Syne_800ExtraBold' }}>
+                      Create
+                    </Text>
+                  </LinearGradient>
+                </Pressable>
+                {onPressSecondary && (
+                  <Pressable
+                    style={{ flex: 1 }}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      onPressSecondary.onPress();
+                    }}
+                  >
+                    <View
+                      style={{
+                        paddingVertical: 10,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(255,255,255,0.06)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.1)',
+                      }}
+                    >
+                      <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
+                        {onPressSecondary.label}
+                      </Text>
+                    </View>
+                  </Pressable>
+                )}
+              </View>
+            </LinearGradient>
+          </Card>
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function StatPill({ emoji, label }: { emoji: string; label: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: Colors.bg.card,
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
+      }}
+    >
+      <Text style={{ fontSize: 14 }}>{emoji}</Text>
+      <Text style={{ color: Colors.text.secondary, fontSize: 12, fontFamily: 'Inter_500Medium' }}>{label}</Text>
+    </View>
   );
 }
 
 export default function HomeScreen() {
-  const user = useAuthStore((s) => s.user);
-  const randomEmoji = ANON_EMOJIS[Math.floor(Math.random() * ANON_EMOJIS.length)];
-
-  const greetOpacity = useSharedValue(0);
-  useEffect(() => {
-    greetOpacity.value = withSpring(1, SpringConfig.gentle);
-  }, []);
-  const greetStyle = useAnimatedStyle(() => ({ opacity: greetOpacity.value }));
+  // 0=header, 1=pills, 2=card1, 3=card2, 4=section title, 5=quick action row
+  const anims = useStaggeredEntrance(6, 80);
+  const randomAvatar = ANON_AVATARS[Math.floor(Math.random() * ANON_AVATARS.length)];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg.primary }}>
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 24 }} showsVerticalScrollIndicator={false}>
-        <Animated.View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, greetStyle]}>
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingBottom: 32, gap: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <Animated.View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, anims[0]]}>
           <View style={{ gap: 2 }}>
             <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
               Welcome back 👋
             </Text>
-            <Text style={{ color: Colors.text.primary, fontSize: 24, fontFamily: 'Syne_900Black' }}>
+            <Text style={{ color: Colors.text.primary, fontSize: 26, fontFamily: 'Syne_900Black', letterSpacing: -0.5 }}>
               Anonymous
             </Text>
           </View>
-          <View
+          <Pressable
+            onPress={() => Haptics.selectionAsync()}
             style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
+              width: 46,
+              height: 46,
+              borderRadius: 23,
               backgroundColor: Colors.bg.card,
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 2,
               borderColor: 'rgba(59,130,246,0.3)',
+              shadowColor: '#3b82f6',
+              shadowOpacity: 0.2,
+              shadowRadius: 8,
+              elevation: 4,
             }}
           >
-            <Text style={{ fontSize: 24 }}>{randomEmoji}</Text>
-          </View>
+            <Text style={{ fontSize: 24 }}>{randomAvatar}</Text>
+          </Pressable>
         </Animated.View>
 
-        <View style={{ gap: 4 }}>
-          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1 }}>
+        {/* Stat pills */}
+        <Animated.View style={[{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, anims[1]]}>
+          <StatPill emoji="🎲" label="100% Anonymous" />
+          <StatPill emoji="⚡" label="Real-time" />
+          <StatPill emoji="💬" label="24h Auto-delete" />
+        </Animated.View>
+
+        {/* Section label */}
+        <Animated.View style={anims[4]}>
+          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>
             Choose Your Game
           </Text>
-        </View>
+        </Animated.View>
 
-        <View style={{ gap: 16 }}>
-          <GameCard
-            emoji="🍾"
-            title="Spin the Bottle"
-            subtitle="Truth or Dare with your class — anonymous & chaotic"
-            badge="MULTIPLAYER"
-            accentColor={Colors.blue}
-            delay={100}
-            onPress={() => router.push('/game/create')}
-          />
-          <GameCard
-            emoji="💬"
-            title="Class Feed"
-            subtitle="Anonymous confessions, gossip & reactions — 24h auto-delete"
-            badge="SOCIAL"
-            accentColor={Colors.cyan}
-            delay={250}
-            onPress={() => router.push('/feed/create')}
-          />
-        </View>
+        {/* Game cards */}
+        <GameCard
+          emoji="🍾"
+          title="Spin the Bottle"
+          subtitle="Truth or Dare with your class — anonymous spins, wild reactions"
+          badge="MULTIPLAYER"
+          badgeColor={Colors.blue}
+          gradientColors={['#3b82f6', '#06b6d4']}
+          animStyle={anims[2]}
+          onPress={() => router.push('/game/create')}
+          onPressSecondary={{ label: 'Join', onPress: () => router.push('/game/join') }}
+        />
 
-        <View style={{ gap: 12 }}>
-          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1 }}>
-            Quick Actions
+        <GameCard
+          emoji="💬"
+          title="Class Feed"
+          subtitle="Anonymous confessions, gossip & reactions — disappears in 24 hours"
+          badge="SOCIAL"
+          badgeColor={Colors.cyan}
+          gradientColors={['#06b6d4', '#8b5cf6']}
+          animStyle={anims[3]}
+          onPress={() => router.push('/feed/create')}
+          onPressSecondary={{ label: 'Join', onPress: () => router.push('/feed/join') }}
+        />
+
+        {/* Quick actions */}
+        <Animated.View style={[{ gap: 10 }, anims[5]]}>
+          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+            Quick Join
           </Text>
           <View style={{ flexDirection: 'row', gap: 12 }}>
             {[
-              { label: 'Join Game', emoji: '🎯', route: '/game/join' },
-              { label: 'Join Feed', emoji: '📱', route: '/feed/join' },
-            ].map(({ label, emoji, route }) => (
-              <Pressable key={route} style={{ flex: 1 }} onPress={() => router.push(route as any)}>
+              { emoji: '🎯', label: 'Join Game', route: '/game/join', color: Colors.blue },
+              { emoji: '📱', label: 'Join Feed', route: '/feed/join', color: Colors.cyan },
+            ].map(({ emoji, label, route, color }) => (
+              <Pressable
+                key={route}
+                style={{ flex: 1 }}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push(route as any);
+                }}
+              >
                 <View
                   style={{
                     backgroundColor: Colors.bg.card,
                     borderRadius: BorderRadius.card,
                     borderWidth: 1,
                     borderColor: 'rgba(255,255,255,0.06)',
-                    padding: 16,
+                    padding: 18,
                     alignItems: 'center',
                     gap: 8,
                   }}
                 >
                   <Text style={{ fontSize: 28 }}>{emoji}</Text>
-                  <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
+                  <Text style={{ color: color, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
                     {label}
                   </Text>
                 </View>
               </Pressable>
             ))}
           </View>
-        </View>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
