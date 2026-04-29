@@ -5,6 +5,8 @@ import { Colors, BorderRadius } from '@/constants/theme';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useAuthStore } from '@/store/authStore';
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
+
 function SettingRow({
   icon,
   label,
@@ -57,7 +59,7 @@ function SettingRow({
 export default function SettingsScreen() {
   const { soundEnabled, vibrationEnabled, theme, setSoundEnabled, setVibrationEnabled, setTheme } =
     useSettingsStore();
-  const { clearUser } = useAuthStore();
+  const { clearUser, token } = useAuthStore();
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -65,7 +67,15 @@ export default function SettingsScreen() {
       {
         text: 'Sign Out',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
+          try {
+            await fetch(`${API_URL}/auth/logout`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+            });
+          } catch {
+            // ignore network errors on logout
+          }
           clearUser();
           router.replace('/(auth)/landing');
         },

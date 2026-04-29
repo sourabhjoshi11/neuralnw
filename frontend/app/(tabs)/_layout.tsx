@@ -1,6 +1,7 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '@/store/authStore';
 import { Colors } from '@/constants/theme';
 
 type TabIconProps = {
@@ -27,6 +28,13 @@ function TabIcon({ name, focused, label }: TabIconProps) {
 }
 
 export default function TabsLayout() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  // Not logged in — send to auth
+  if (!isAuthenticated) {
+    return <Redirect href="/(auth)/landing" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
@@ -45,25 +53,33 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} label="Home" />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="home" focused={focused} label="Home" />
+          ),
         }}
       />
       <Tabs.Screen
         name="games"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="game-controller" focused={focused} label="Games" />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="game-controller" focused={focused} label="Games" />
+          ),
         }}
       />
       <Tabs.Screen
         name="feed"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="chatbubbles" focused={focused} label="Feed" />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="chatbubbles" focused={focused} label="Feed" />
+          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="settings" focused={focused} label="Settings" />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="settings" focused={focused} label="Settings" />
+          ),
         }}
       />
     </Tabs>
