@@ -19,6 +19,7 @@ export type AnonPlayer = {
   blackoutEndsAt: string | null;
   turnCount: number;
   lastTurnAt: string | null;
+  joinOrder: number;
 };
 
 export type Room = {
@@ -41,6 +42,7 @@ export type GamePhase =
   | 'choice'
   | 'truth_question'
   | 'truth_answer'
+  | 'truth_revealed'
   | 'dare_show'
   | 'dare_vote'
   | 'reaction'
@@ -99,24 +101,27 @@ export type FeedMessage = {
 };
 
 export type WSMessage =
-  | { type: 'player_join'; data: { player: AnonPlayer } }
+  | { type: 'state_sync'; data: Record<string, unknown> }
+  | { type: 'player_join'; data: Record<string, unknown> }
   | { type: 'player_leave'; data: { playerId: string } }
-  | { type: 'game_start'; data: { startsAt: string; endsAt: string } }
-  | { type: 'spin_start'; data: { serverTime: string } }
-  | { type: 'spin_result'; data: { targetPlayerId: string; targetColor: string } }
+  | { type: 'game_start'; data: Record<string, unknown> }
+  | { type: 'spin_start'; data: Record<string, unknown> }
+  | { type: 'spin_result'; data: Record<string, unknown> }
   | { type: 'choice_made'; data: { choice: 'truth' | 'dare' } }
-  | { type: 'content_shown'; data: { content: TruthOrDare } }
-  | { type: 'answer_submitted'; data: { answer: string } }
+  | { type: 'content_shown'; data: Record<string, unknown> }
+  | { type: 'answer_submitted'; data: Record<string, unknown> }
   | { type: 'vote_update'; data: { votes: Vote[]; total: number } }
-  | { type: 'reaction'; data: Reaction }
-  | { type: 'comment'; data: Comment }
-  | { type: 'phase_change'; data: { phase: GamePhase; endsAt?: string } }
-  | { type: 'points_update'; data: { playerId: string; points: number; delta: number } }
-  | { type: 'blackout_start'; data: { playerId: string; duration: number; message: string } }
+  | { type: 'reaction'; data: Record<string, unknown> }
+  | { type: 'comment'; data: Record<string, unknown> }
+  | { type: 'phase_change'; data: Record<string, unknown> }
+  | { type: 'points_update'; data: Record<string, unknown> }
+  | { type: 'blackout_start'; data: Record<string, unknown> }
   | { type: 'punishment_vote_result'; data: { result: 'ban' | 'reveal'; targetId: string } }
   | { type: 'identity_reveal'; data: { playerId: string; realName: string; phoneLast4: string } }
-  | { type: 'game_end'; data: { leaderboard: AnonPlayer[]; lastPlaceReveal: { name: string; phoneLast4: string } | null } }
-  | { type: 'player_colors_shuffle'; data: { colorMap: Record<string, string> } }
+  | { type: 'game_end'; data: Record<string, unknown> }
+  | { type: 'player_colors_shuffle'; data: { color_map: Record<string, string> } }
+  | { type: 'dare_result'; data: Record<string, unknown> }
+  | { type: 'skip_life_used'; data: Record<string, unknown> }
   | { type: 'error'; data: { message: string } }
   | { type: 'ping'; data: Record<string, never> }
   | { type: 'pong'; data: Record<string, never> };

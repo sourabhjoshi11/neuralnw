@@ -9,12 +9,15 @@ type GameState = {
   myPlayer: AnonPlayer | null;
   phase: GamePhase;
   currentTurnPlayerId: string | null;
+  currentRoundId: string | null;
   currentContent: TruthOrDare | null;
   currentAnswer: string | null;
   votes: Vote[];
   reactions: Reaction[];
   comments: Comment[];
   phaseEndsAt: string | null;
+  leaderboard: AnonPlayer[];
+  lastPlaceReveal: { name: string; phoneLast4: string } | null;
   isConnected: boolean;
   isReconnecting: boolean;
   reconnectAttempts: number;
@@ -27,9 +30,11 @@ type GameState = {
   setMyPlayer: (player: AnonPlayer) => void;
   setPhase: (phase: GamePhase, endsAt?: string) => void;
   setCurrentTurn: (playerId: string | null) => void;
+  setCurrentRoundId: (id: string | null) => void;
   setCurrentContent: (content: TruthOrDare | null) => void;
   setCurrentAnswer: (answer: string | null) => void;
   setVotes: (votes: Vote[]) => void;
+  setLeaderboard: (players: AnonPlayer[], reveal: { name: string; phoneLast4: string } | null) => void;
   addReaction: (reaction: Reaction) => void;
   addComment: (comment: Comment) => void;
   updateColorMap: (colorMap: Record<string, string>) => void;
@@ -46,12 +51,15 @@ const initialState = {
   myPlayer: null,
   phase: 'lobby' as GamePhase,
   currentTurnPlayerId: null,
+  currentRoundId: null,
   currentContent: null,
   currentAnswer: null,
   votes: [],
   reactions: [],
   comments: [],
   phaseEndsAt: null,
+  leaderboard: [] as AnonPlayer[],
+  lastPlaceReveal: null as { name: string; phoneLast4: string } | null,
   isConnected: false,
   isReconnecting: false,
   reconnectAttempts: 0,
@@ -93,8 +101,13 @@ export const useGameStore = create<GameState>()(
 
       setCurrentTurn: (currentTurnPlayerId) => set({ currentTurnPlayerId }),
 
+      setCurrentRoundId: (currentRoundId) => set({ currentRoundId }),
+
       setCurrentContent: (currentContent) =>
         set({ currentContent, votes: [], reactions: [], comments: [] }),
+
+      setLeaderboard: (leaderboard, lastPlaceReveal) =>
+        set({ leaderboard, lastPlaceReveal }),
 
       setCurrentAnswer: (currentAnswer) => set({ currentAnswer }),
 
