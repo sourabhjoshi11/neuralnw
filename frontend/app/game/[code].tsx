@@ -26,6 +26,8 @@ import { Colors, BorderRadius, SpringConfig } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 import { useGameStore } from '@/store/gameStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useGameTimer } from '@/hooks/useGameTimer';
+import { SpinWheel } from '@/components/ui/SpinWheel';
 import type { AnonPlayer, WSMessage } from '@/types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
@@ -476,164 +478,301 @@ function LobbyView({
   );
 }
 
+// ─── PlayerStrip ──────────────────────────────────────────────────────────────
+
+function PlayerStrip({
+  players,
+  currentTurnPlayerId,
+}: {
+  players: AnonPlayer[];
+  currentTurnPlayerId: string | null;
+}) {
+  return (
+    <View
+      style={{
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.06)',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+      }}
+    >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+        {players.map((p) => (
+          <View key={p.id} style={{ alignItems: 'center', gap: 3 }}>
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: p.color + '22',
+                borderWidth: p.id === currentTurnPlayerId ? 2.5 : 1.5,
+                borderColor: p.id === currentTurnPlayerId ? p.color : p.color + '55',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: p.isBlackedOut ? 0.3 : 1,
+              }}
+            >
+              <Text style={{ color: p.color, fontSize: 12, fontFamily: 'Syne_800ExtraBold' }}>
+                {p.username[0]?.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={{ color: Colors.text.muted, fontSize: 9, fontFamily: 'Inter_500Medium' }}>
+              {p.points}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── SpinPhaseView ────────────────────────────────────────────────────────────
+
+function SpinPhaseView({
+  players,
+  myPlayer,
+  currentTurnPlayerId,
+}: {
+  players: AnonPlayer[];
+  myPlayer: AnonPlayer | null;
+  currentTurnPlayerId: string | null;
+}) {
+  const activePlayers = players.filter((p) => !p.isBlackedOut);
+
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 24, padding: 20 }}>
+      <SpinWheel
+        players={activePlayers.length > 0 ? activePlayers : players}
+        targetPlayerId={currentTurnPlayerId}
+        spinning={!!currentTurnPlayerId}
+        size={270}
+      />
+      <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+        🍾 Spinning...
+      </Text>
+    </View>
+  );
+}
+
+// ─── ChoicePhaseView ──────────────────────────────────────────────────────────
+
+function ChoicePhaseView({
+  players,
+  myPlayer,
+  currentTurnPlayerId,
+  currentRoundId,
+  phaseEndsAt,
+  token,
+}: {
+  players: AnonPlayer[];
+  myPlayer: AnonPlayer | null;
+  currentTurnPlayerId: string | null;
+  currentRoundId: string | null;
+  phaseEndsAt: string | null;
+  token: string | null;
+}) {
+  const isMyTurn = myPlayer?.id === currentTurnPlayerId;
+  const turnPlayer = players.find((p) => p.id === currentTurnPlayerId);
+  const { formatted } = useGameTimer(phaseEndsAt);
+  const [submitting, setSubmitting] = useState(false);
+  const truthScale = useSharedValue(1);
+  const dareScale = useSharedValue(1);
+  const truthStyle = useAnimatedStyle(() => ({ transform: [{ scale: truthScale.value }] }));
+  const dareStyle = useAnimatedStyle(() => ({ transform: [{ scale: dareScale.value }] }));
+
+  const submit = async (choice: 'truth' | 'dare') => {
+    if (!currentRoundId || !token || submitting) return;
+    setSubmitting(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await fetch(`${API_URL}/game/rounds/${currentRoundId}/choice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ choice }),
+      });
+    } catch {
+      // WS will handle phase update; if it fails server timer covers it
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 28 }}>
+        {/* Turn player banner */}
+        {turnPlayer && (
+          <View style={{ alignItems: 'center', gap: 10 }}>
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 32,
+                backgroundColor: turnPlayer.color + '22',
+                borderWidth: 3,
+                borderColor: turnPlayer.color,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: turnPlayer.color, fontSize: 26, fontFamily: 'Syne_900Black' }}>
+                {turnPlayer.username[0]?.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={{ color: turnPlayer.color, fontSize: 20, fontFamily: 'Syne_900Black' }}>
+              {isMyTurn ? 'Your turn!' : `${turnPlayer.username}'s turn`}
+            </Text>
+          </View>
+        )}
+
+        {isMyTurn ? (
+          <>
+            <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Inter_400Regular' }}>
+              Pick your poison
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 16, width: '100%' }}>
+              {/* Truth */}
+              <Pressable
+                style={{ flex: 1 }}
+                onPress={() => submit('truth')}
+                onPressIn={() => { truthScale.value = withSpring(0.94, SpringConfig.snappy); }}
+                onPressOut={() => { truthScale.value = withSpring(1, SpringConfig.default); }}
+                disabled={submitting}
+              >
+                <Animated.View style={truthStyle}>
+                  <LinearGradient
+                    colors={['#3b82f6', '#2563eb']}
+                    style={{
+                      borderRadius: BorderRadius.card,
+                      padding: 24,
+                      alignItems: 'center',
+                      gap: 10,
+                      shadowColor: '#3b82f6',
+                      shadowOpacity: 0.5,
+                      shadowRadius: 20,
+                      shadowOffset: { width: 0, height: 4 },
+                      elevation: 10,
+                    }}
+                  >
+                    <Text style={{ fontSize: 36 }}>🎯</Text>
+                    <Text style={{ color: '#fff', fontSize: 18, fontFamily: 'Syne_900Black' }}>Truth</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontFamily: 'Inter_400Regular' }}>+10 pts</Text>
+                  </LinearGradient>
+                </Animated.View>
+              </Pressable>
+
+              {/* Dare */}
+              <Pressable
+                style={{ flex: 1 }}
+                onPress={() => submit('dare')}
+                onPressIn={() => { dareScale.value = withSpring(0.94, SpringConfig.snappy); }}
+                onPressOut={() => { dareScale.value = withSpring(1, SpringConfig.default); }}
+                disabled={submitting}
+              >
+                <Animated.View style={dareStyle}>
+                  <LinearGradient
+                    colors={['#8b5cf6', '#7c3aed']}
+                    style={{
+                      borderRadius: BorderRadius.card,
+                      padding: 24,
+                      alignItems: 'center',
+                      gap: 10,
+                      shadowColor: '#8b5cf6',
+                      shadowOpacity: 0.5,
+                      shadowRadius: 20,
+                      shadowOffset: { width: 0, height: 4 },
+                      elevation: 10,
+                    }}
+                  >
+                    <Text style={{ fontSize: 36 }}>🔥</Text>
+                    <Text style={{ color: '#fff', fontSize: 18, fontFamily: 'Syne_900Black' }}>Dare</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontFamily: 'Inter_400Regular' }}>+20 pts</Text>
+                  </LinearGradient>
+                </Animated.View>
+              </Pressable>
+            </View>
+
+            {/* Timer */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+                Time left:
+              </Text>
+              <Text style={{ color: Colors.yellow, fontSize: 14, fontFamily: 'Inter_700Bold' }}>
+                {formatted}
+              </Text>
+            </View>
+          </>
+        ) : (
+          <View style={{ alignItems: 'center', gap: 12 }}>
+            <ActivityIndicator color={turnPlayer?.color ?? Colors.blue} />
+            <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Inter_400Regular' }}>
+              {turnPlayer?.username ?? 'Player'} is choosing...
+            </Text>
+            <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+              {formatted}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
 // ─── ActiveView ───────────────────────────────────────────────────────────────
-// Phase 7+ will replace the center area with the spin wheel and phase sub-views.
 
 function ActiveView({
   players,
   myPlayer,
   phase,
   currentTurnPlayerId,
+  currentRoundId,
+  phaseEndsAt,
   isReconnecting,
+  token,
 }: {
   players: AnonPlayer[];
   myPlayer: AnonPlayer | null;
   phase: string;
   currentTurnPlayerId: string | null;
+  currentRoundId: string | null;
+  phaseEndsAt: string | null;
   isReconnecting: boolean;
+  token: string | null;
 }) {
-  const turnPlayer = players.find((p) => p.id === currentTurnPlayerId);
-  const phaseLabel = phase.replace(/_/g, ' ');
-
   return (
     <View style={{ flex: 1 }}>
       <ConnectionBanner visible={isReconnecting} />
 
-      {/* Center content — Phase 7 fills this */}
-      <View
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 24 }}
-      >
-        <View
-          style={{
-            width: 88,
-            height: 88,
-            borderRadius: 44,
-            backgroundColor: 'rgba(59,130,246,0.08)',
-            borderWidth: 2,
-            borderColor: Colors.blue + '44',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ fontSize: 40 }}>🍾</Text>
+      {/* Phase content */}
+      {phase === 'spinning' ? (
+        <SpinPhaseView
+          players={players}
+          myPlayer={myPlayer}
+          currentTurnPlayerId={currentTurnPlayerId}
+        />
+      ) : phase === 'choice' ? (
+        <ChoicePhaseView
+          players={players}
+          myPlayer={myPlayer}
+          currentTurnPlayerId={currentTurnPlayerId}
+          currentRoundId={currentRoundId}
+          phaseEndsAt={phaseEndsAt}
+          token={token}
+        />
+      ) : (
+        /* Phase 8+ placeholder for truth/dare/reaction/vote phases */
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 }}>
+          <Text style={{ fontSize: 40 }}>⏳</Text>
+          <Text style={{ color: Colors.text.primary, fontSize: 18, fontFamily: 'Syne_800ExtraBold', textAlign: 'center' }}>
+            {phase.replace(/_/g, ' ')}
+          </Text>
+          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
+            This phase coming soon
+          </Text>
         </View>
+      )}
 
-        <View style={{ alignItems: 'center', gap: 8 }}>
-          {turnPlayer ? (
-            <>
-              <Text
-                style={{
-                  color: Colors.text.muted,
-                  fontSize: 12,
-                  fontFamily: 'Inter_400Regular',
-                  letterSpacing: 1,
-                  textTransform: 'uppercase',
-                }}
-              >
-                Current Turn
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 13,
-                    backgroundColor: turnPlayer.color + '22',
-                    borderWidth: 2,
-                    borderColor: turnPlayer.color,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: turnPlayer.color,
-                      fontSize: 11,
-                      fontFamily: 'Syne_800ExtraBold',
-                    }}
-                  >
-                    {turnPlayer.username[0]?.toUpperCase()}
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    color: turnPlayer.color,
-                    fontSize: 22,
-                    fontFamily: 'Syne_900Black',
-                  }}
-                >
-                  {turnPlayer.username}
-                  {turnPlayer.id === myPlayer?.id ? ' (you!)' : "'s turn"}
-                </Text>
-              </View>
-            </>
-          ) : (
-            <Text
-              style={{ color: Colors.text.primary, fontSize: 20, fontFamily: 'Syne_800ExtraBold' }}
-            >
-              Game in Progress
-            </Text>
-          )}
-
-          <View
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.06)',
-              borderRadius: 8,
-              paddingHorizontal: 12,
-              paddingVertical: 4,
-            }}
-          >
-            <Text
-              style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_500Medium' }}
-            >
-              {phaseLabel}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Compact player strip */}
-      <View
-        style={{
-          borderTopWidth: 1,
-          borderTopColor: 'rgba(255,255,255,0.06)',
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-        }}
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 10 }}
-        >
-          {players.map((p) => (
-            <View key={p.id} style={{ alignItems: 'center', gap: 4 }}>
-              <View
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 19,
-                  backgroundColor: p.color + '22',
-                  borderWidth: p.id === currentTurnPlayerId ? 2.5 : 1.5,
-                  borderColor: p.id === currentTurnPlayerId ? p.color : p.color + '55',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: p.isBlackedOut ? 0.35 : 1,
-                }}
-              >
-                <Text style={{ color: p.color, fontSize: 13, fontFamily: 'Syne_800ExtraBold' }}>
-                  {p.username[0]?.toUpperCase()}
-                </Text>
-              </View>
-              <Text
-                style={{ color: Colors.text.muted, fontSize: 10, fontFamily: 'Inter_500Medium' }}
-              >
-                {p.points}
-              </Text>
-            </View>
-          ))}
-        </ScrollView>
-      </View>
+      <PlayerStrip players={players} currentTurnPlayerId={currentTurnPlayerId} />
     </View>
   );
 }
@@ -1180,7 +1319,10 @@ export default function GameRoomScreen() {
           myPlayer={store.myPlayer}
           phase={store.phase}
           currentTurnPlayerId={store.currentTurnPlayerId}
+          currentRoundId={store.currentRoundId}
+          phaseEndsAt={store.phaseEndsAt}
           isReconnecting={store.isReconnecting}
+          token={token}
         />
       ) : (
         <EndedView
