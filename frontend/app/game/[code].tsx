@@ -28,6 +28,7 @@ import { useGameStore } from '@/store/gameStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useGameTimer } from '@/hooks/useGameTimer';
 import { SpinWheel } from '@/components/ui/SpinWheel';
+import { TruthQuestionView, TruthAnswerView, ReactionView } from '@/components/game/GamePhases';
 import type { AnonPlayer, WSMessage } from '@/types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
@@ -726,24 +727,35 @@ function ActiveView({
   phase,
   currentTurnPlayerId,
   currentRoundId,
+  currentContent,
+  currentAnswer,
+  reactions,
+  comments,
   phaseEndsAt,
   isReconnecting,
   token,
+  roomCode,
 }: {
   players: AnonPlayer[];
   myPlayer: AnonPlayer | null;
   phase: string;
   currentTurnPlayerId: string | null;
   currentRoundId: string | null;
+  currentContent: import('@/types').TruthOrDare | null;
+  currentAnswer: string | null;
+  reactions: import('@/types').Reaction[];
+  comments: import('@/types').Comment[];
   phaseEndsAt: string | null;
   isReconnecting: boolean;
   token: string | null;
+  roomCode: string;
 }) {
+  const showStrip = phase !== 'reaction';
+
   return (
     <View style={{ flex: 1 }}>
       <ConnectionBanner visible={isReconnecting} />
 
-      {/* Phase content */}
       {phase === 'spinning' ? (
         <SpinPhaseView
           players={players}
@@ -759,20 +771,46 @@ function ActiveView({
           phaseEndsAt={phaseEndsAt}
           token={token}
         />
+      ) : phase === 'truth_question' ? (
+        <TruthQuestionView
+          players={players}
+          currentTurnPlayerId={currentTurnPlayerId}
+          content={currentContent}
+          phaseEndsAt={phaseEndsAt}
+        />
+      ) : phase === 'truth_answer' || phase === 'truth_revealed' ? (
+        <TruthAnswerView
+          players={players}
+          myPlayer={myPlayer}
+          currentTurnPlayerId={currentTurnPlayerId}
+          currentRoundId={currentRoundId}
+          content={currentContent}
+          phaseEndsAt={phaseEndsAt}
+          token={token}
+          roomCode={roomCode}
+        />
+      ) : phase === 'reaction' ? (
+        <ReactionView
+          players={players}
+          myPlayer={myPlayer}
+          currentRoundId={currentRoundId}
+          content={currentContent}
+          currentAnswer={currentAnswer}
+          reactions={reactions}
+          comments={comments}
+          phaseEndsAt={phaseEndsAt}
+          token={token}
+        />
       ) : (
-        /* Phase 8+ placeholder for truth/dare/reaction/vote phases */
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 }}>
           <Text style={{ fontSize: 40 }}>⏳</Text>
           <Text style={{ color: Colors.text.primary, fontSize: 18, fontFamily: 'Syne_800ExtraBold', textAlign: 'center' }}>
             {phase.replace(/_/g, ' ')}
           </Text>
-          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
-            This phase coming soon
-          </Text>
         </View>
       )}
 
-      <PlayerStrip players={players} currentTurnPlayerId={currentTurnPlayerId} />
+      {showStrip && <PlayerStrip players={players} currentTurnPlayerId={currentTurnPlayerId} />}
     </View>
   );
 }
@@ -1320,9 +1358,14 @@ export default function GameRoomScreen() {
           phase={store.phase}
           currentTurnPlayerId={store.currentTurnPlayerId}
           currentRoundId={store.currentRoundId}
+          currentContent={store.currentContent}
+          currentAnswer={store.currentAnswer}
+          reactions={store.reactions}
+          comments={store.comments}
           phaseEndsAt={store.phaseEndsAt}
           isReconnecting={store.isReconnecting}
           token={token}
+          roomCode={code ?? ''}
         />
       ) : (
         <EndedView
