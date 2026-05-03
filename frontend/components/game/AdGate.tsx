@@ -1,14 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, Modal } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
-import { Colors, BorderRadius } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 
 const AD_DURATION = 5;
 
 export function AdGate({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
   const [countdown, setCountdown] = useState(AD_DURATION);
   const progress = useSharedValue(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!visible) {
@@ -19,19 +18,16 @@ export function AdGate({ visible, onDismiss }: { visible: boolean; onDismiss: ()
 
     progress.value = withTiming(1, { duration: AD_DURATION * 1000, easing: Easing.linear });
 
-    intervalRef.current = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(intervalRef.current!);
-          onDismiss();
-          return 0;
-        }
-        return c - 1;
-      });
+    // Separate timer for dismiss — never call side-effects inside a setState updater
+    const dismissTimer = setTimeout(onDismiss, AD_DURATION * 1000);
+
+    const interval = setInterval(() => {
+      setCountdown((c) => Math.max(0, c - 1));
     }, 1000);
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      clearTimeout(dismissTimer);
+      clearInterval(interval);
     };
   }, [visible]);
 

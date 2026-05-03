@@ -1,13 +1,7 @@
+// Stub — replace body with real impl after:
+//   npx expo install expo-notifications
+// Then add to app.json plugins:
+//   ["expo-notifications", { "icon": "./assets/images/icon.png" }]
 export async function requestNotificationPermission(): Promise<boolean> {
-  try {
-    // expo-notifications must be installed: npx expo install expo-notifications
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { getPermissionsAsync, requestPermissionsAsync } = require('expo-notifications');
-    const { status: existing } = await getPermissionsAsync();
-    if (existing === 'granted') return true;
-    const { status } = await requestPermissionsAsync();
-    return status === 'granted';
-  } catch {
-    return false;
-  }
+  return false;
 }

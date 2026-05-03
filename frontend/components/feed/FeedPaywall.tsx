@@ -40,7 +40,8 @@ export function FeedPaywall({
         style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}
         onPress={onClose}
       >
-        <Pressable onPress={(e) => e.stopPropagation()}>
+        {/* View (not Pressable) so taps on the sheet don't bubble to the backdrop */}
+        <View>
           <View
             style={{
               backgroundColor: Colors.bg.card,
@@ -197,7 +198,7 @@ export function FeedPaywall({
               </Text>
             </Pressable>
           </View>
-        </Pressable>
+        </View>
       </Pressable>
     </Modal>
   );
