@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -984,12 +984,16 @@ export function PunishmentVoteView({
   currentTurnPlayerId,
   phaseEndsAt,
   votes,
+  optionA = 'Option A',
+  optionB = 'Option B',
 }: {
   players: AnonPlayer[];
   myPlayer: AnonPlayer | null;
   currentTurnPlayerId: string | null;
   phaseEndsAt: string | null;
   votes: import('@/types').Vote[];
+  optionA?: string;
+  optionB?: string;
 }) {
   const [myVote, setMyVote] = useState<'a' | 'b' | null>(null);
   const turnPlayer = players.find((p) => p.id === currentTurnPlayerId);
@@ -1103,8 +1107,11 @@ export function PunishmentVoteView({
                   alignItems: 'center',
                 }}
               >
-                <Text style={{ color: opt === 'a' ? Colors.blue : 'rgba(139,92,246,0.9)', fontSize: 32, fontFamily: 'Syne_900Black' }}>
+                <Text style={{ color: opt === 'a' ? Colors.blue : 'rgba(139,92,246,0.9)', fontSize: 28, fontFamily: 'Syne_900Black' }}>
                   {opt.toUpperCase()}
+                </Text>
+                <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 8 }}>
+                  {opt === 'a' ? optionA : optionB}
                 </Text>
               </LinearGradient>
             </Pressable>
@@ -1112,5 +1119,143 @@ export function PunishmentVoteView({
         </View>
       )}
     </ScrollView>
+  );
+}
+
+// ─── IdentityRevealView ───────────────────────────────────────────────────────
+
+export function IdentityRevealView({
+  players,
+  reveal,
+  phaseEndsAt,
+}: {
+  players: AnonPlayer[];
+  reveal: { playerId: string; realName: string; phoneLast4: string } | null;
+  phaseEndsAt: string | null;
+}) {
+  const target = reveal ? players.find((p) => p.id === reveal.playerId) : null;
+
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 24 }}>
+      <Animated.View entering={FadeIn.duration(400)} style={{ alignItems: 'center', gap: 8 }}>
+        <Text style={{ fontSize: 52 }}>🎭</Text>
+        <Text style={{ color: Colors.text.primary, fontSize: 26, fontFamily: 'Syne_800ExtraBold', textAlign: 'center' }}>
+          Identity Revealed!
+        </Text>
+        {target && (
+          <Text style={{ color: target.color, fontSize: 16, fontFamily: 'Inter_600SemiBold' }}>
+            {target.username}
+          </Text>
+        )}
+      </Animated.View>
+
+      {reveal ? (
+        <Animated.View
+          entering={FadeIn.duration(600).delay(300)}
+          style={{
+            width: '100%',
+            borderRadius: BorderRadius.card,
+            borderWidth: 1.5,
+            borderColor: 'rgba(239,68,68,0.35)',
+            backgroundColor: 'rgba(239,68,68,0.08)',
+            padding: 24,
+            gap: 16,
+            alignItems: 'center',
+          }}
+        >
+          <View style={{ alignItems: 'center', gap: 4 }}>
+            <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_500Medium', letterSpacing: 1 }}>
+              REAL NAME
+            </Text>
+            <Text style={{ color: Colors.text.primary, fontSize: 24, fontFamily: 'Syne_800ExtraBold' }}>
+              {reveal.realName}
+            </Text>
+          </View>
+          <View style={{ width: '100%', height: 1, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+          <View style={{ alignItems: 'center', gap: 4 }}>
+            <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_500Medium', letterSpacing: 1 }}>
+              PHONE
+            </Text>
+            <Text style={{ color: Colors.text.primary, fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: 4 }}>
+              ···· ···· ···· {reveal.phoneLast4}
+            </Text>
+          </View>
+        </Animated.View>
+      ) : (
+        <View
+          style={{
+            width: '100%',
+            borderRadius: BorderRadius.card,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.06)',
+            backgroundColor: Colors.bg.card,
+            padding: 24,
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <ActivityIndicator color={Colors.red} />
+          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+            Revealing identity...
+          </Text>
+        </View>
+      )}
+
+      <TimerPill endsAt={phaseEndsAt} />
+    </View>
+  );
+}
+
+// ─── PunishmentBanner ─────────────────────────────────────────────────────────
+
+export function PunishmentBanner({
+  result,
+  players,
+  onDismiss,
+}: {
+  result: { result: 'ban' | 'reveal'; targetId: string };
+  players: AnonPlayer[];
+  onDismiss: () => void;
+}) {
+  const target = players.find((p) => p.id === result.targetId);
+  const isBan = result.result === 'ban';
+
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        margin: 12,
+        borderRadius: BorderRadius.card,
+        borderWidth: 1,
+        borderColor: isBan ? 'rgba(239,68,68,0.35)' : 'rgba(245,158,11,0.35)',
+        backgroundColor: isBan ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+        padding: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+      }}
+    >
+      <Text style={{ fontSize: 22 }}>{isBan ? '🔨' : '🎭'}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: isBan ? Colors.red : Colors.yellow, fontSize: 14, fontFamily: 'Syne_800ExtraBold' }}>
+          {isBan ? 'Player Banned' : 'Identity Revealing...'}
+        </Text>
+        {target && (
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+            {target.username} {isBan ? 'has been removed' : "'s identity is revealed"}
+          </Text>
+        )}
+      </View>
+    </Animated.View>
   );
 }

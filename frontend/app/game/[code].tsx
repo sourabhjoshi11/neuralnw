@@ -35,6 +35,8 @@ import {
   DareShowView,
   DareVoteView,
   PunishmentVoteView,
+  IdentityRevealView,
+  PunishmentBanner,
 } from '@/components/game/GamePhases';
 import type { AnonPlayer, WSMessage } from '@/types';
 
@@ -744,6 +746,10 @@ function ActiveView({
   token,
   roomCode,
   dareResult,
+  punishmentResult,
+  identityReveal,
+  punishmentOptions,
+  onDismissPunishment,
 }: {
   players: AnonPlayer[];
   myPlayer: AnonPlayer | null;
@@ -760,12 +766,24 @@ function ActiveView({
   token: string | null;
   roomCode: string;
   dareResult: { passed: boolean; yesVotes: number; totalVotes: number } | null;
+  punishmentResult: { result: 'ban' | 'reveal'; targetId: string } | null;
+  identityReveal: { playerId: string; realName: string; phoneLast4: string } | null;
+  punishmentOptions: { a: string; b: string } | null;
+  onDismissPunishment: () => void;
 }) {
-  const showStrip = phase !== 'reaction' && phase !== 'dare_vote' && phase !== 'punishment_vote';
+  const showStrip = phase !== 'reaction' && phase !== 'dare_vote' && phase !== 'punishment_vote' && phase !== 'identity_reveal';
 
   return (
     <View style={{ flex: 1 }}>
       <ConnectionBanner visible={isReconnecting} />
+
+      {punishmentResult && (
+        <PunishmentBanner
+          result={punishmentResult}
+          players={players}
+          onDismiss={onDismissPunishment}
+        />
+      )}
 
       {phase === 'spinning' ? (
         <SpinPhaseView
@@ -825,6 +843,14 @@ function ActiveView({
           currentTurnPlayerId={currentTurnPlayerId}
           phaseEndsAt={phaseEndsAt}
           votes={votes}
+          optionA={punishmentOptions?.a}
+          optionB={punishmentOptions?.b}
+        />
+      ) : phase === 'identity_reveal' ? (
+        <IdentityRevealView
+          players={players}
+          reveal={identityReveal}
+          phaseEndsAt={phaseEndsAt}
         />
       ) : phase === 'reaction' ? (
         <ReactionView
@@ -1078,6 +1104,19 @@ export default function GameRoomScreen() {
     yesVotes: number;
     totalVotes: number;
   } | null>(null);
+  const [punishmentResult, setPunishmentResult] = useState<{
+    result: 'ban' | 'reveal';
+    targetId: string;
+  } | null>(null);
+  const [identityReveal, setIdentityReveal] = useState<{
+    playerId: string;
+    realName: string;
+    phoneLast4: string;
+  } | null>(null);
+  const [punishmentOptions, setPunishmentOptions] = useState<{
+    a: string;
+    b: string;
+  } | null>(null);
 
   const room = store.room ? mapApiRoom(store.room as unknown as Record<string, unknown>) : null;
   const isHost = !!(user?.id && room?.hostId && user.id === room.hostId);
@@ -1181,7 +1220,15 @@ export default function GameRoomScreen() {
 
         case 'phase_change':
           store.setPhase(d.phase as string, (d.ends_at ?? d.phase_ends_at) as string | undefined);
-          if (d.phase === 'spinning') setDareResult(null);
+          if (d.phase === 'spinning') {
+            setDareResult(null);
+            setIdentityReveal(null);
+            setPunishmentResult(null);
+          }
+          if (d.phase === 'punishment_vote' && d.options) {
+            const opts = d.options as Record<string, string>;
+            setPunishmentOptions({ a: opts.a ?? 'Option A', b: opts.b ?? 'Option B' });
+          }
           break;
 
         case 'content_shown':
@@ -1259,6 +1306,30 @@ export default function GameRoomScreen() {
               ? Haptics.NotificationFeedbackType.Success
               : Haptics.NotificationFeedbackType.Error
           );
+          break;
+
+        case 'punishment_vote_result':
+          setPunishmentResult({
+            result: d.result as 'ban' | 'reveal',
+            targetId: ((d.target_player_id ?? d.targetId) as string) ?? '',
+          });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          if (d.result === 'ban' && d.target_player_id) {
+            store.updatePlayer(d.target_player_id as string, { lives: 0 });
+          }
+          break;
+
+        case 'identity_reveal':
+          setIdentityReveal({
+            playerId: d.playerId as string,
+            realName: d.realName as string,
+            phoneLast4: d.phoneLast4 as string,
+          });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          break;
+
+        case 'error':
+          Alert.alert('Game Error', (d.message as string) ?? 'Something went wrong');
           break;
       }
     },
@@ -1425,6 +1496,10 @@ export default function GameRoomScreen() {
           token={token}
           roomCode={code ?? ''}
           dareResult={dareResult}
+          punishmentResult={punishmentResult}
+          identityReveal={identityReveal}
+          punishmentOptions={punishmentOptions}
+          onDismissPunishment={() => setPunishmentResult(null)}
         />
       ) : (
         <EndedView
