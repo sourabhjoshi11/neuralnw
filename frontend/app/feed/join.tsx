@@ -14,7 +14,7 @@ export default function JoinFeedScreen() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { token } = useAuthStore();
-  const { setFeed } = useFeedStore();
+  const { setFeed, setMyMemberId } = useFeedStore();
   const scale = useSharedValue(1);
   const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -34,6 +34,7 @@ export default function JoinFeedScreen() {
         return;
       }
       setFeed(data.feed);
+      setMyMemberId(data.member.id);
       router.push(`/feed/${data.feed.code}`);
     } catch {
       Alert.alert('Error', 'Network error. Please try again.');

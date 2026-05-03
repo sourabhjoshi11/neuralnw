@@ -5,6 +5,7 @@ import type { Feed, FeedMessage } from '@/types';
 
 type FeedState = {
   feed: Feed | null;
+  myMemberId: string | null;
   messages: FeedMessage[];
   weeklyCount: number;
   weeklyLimit: number;
@@ -13,6 +14,7 @@ type FeedState = {
   typingUsers: { id: string; username: string }[];
 
   setFeed: (feed: Feed) => void;
+  setMyMemberId: (id: string) => void;
   setMessages: (messages: FeedMessage[]) => void;
   prependMessages: (messages: FeedMessage[]) => void;
   addMessage: (message: FeedMessage) => void;
@@ -29,6 +31,7 @@ export const useFeedStore = create<FeedState>()(
   persist(
     (set) => ({
       feed: null,
+      myMemberId: null,
       messages: [],
       weeklyCount: 0,
       weeklyLimit: 5,
@@ -37,6 +40,8 @@ export const useFeedStore = create<FeedState>()(
       typingUsers: [],
 
       setFeed: (feed) => set({ feed }),
+
+      setMyMemberId: (myMemberId) => set({ myMemberId }),
 
       setMessages: (messages) => set({ messages }),
 
@@ -78,6 +83,7 @@ export const useFeedStore = create<FeedState>()(
       clearFeed: () =>
         set({
           feed: null,
+          myMemberId: null,
           messages: [],
           weeklyCount: 0,
           resetAt: null,
@@ -90,6 +96,7 @@ export const useFeedStore = create<FeedState>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         feed: state.feed,
+        myMemberId: state.myMemberId,
         weeklyCount: state.weeklyCount,
         resetAt: state.resetAt,
       }),
