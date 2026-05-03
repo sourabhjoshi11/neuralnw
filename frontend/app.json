@@ -36,17 +36,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font",
-      "expo-haptics",
-      [
-        "expo-screen-capture",
-        {
-          "preventScreenCapture": true
-        }
-      ],
-      [
-        "react-native-reanimated"
-      ]
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
