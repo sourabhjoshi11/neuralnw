@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
+  Easing,
   FadeIn,
   FadeOut,
 } from 'react-native-reanimated';
@@ -536,7 +538,156 @@ function PlayerStrip({
   );
 }
 
+// ─── SlotMachineView ─────────────────────────────────────────────────────────
+
+const SLOT_ITEM_H = 72;
+const SLOT_VISIBLE = 3;
+
+function SlotMachineView({
+  players,
+  currentTurnPlayerId,
+  spinning,
+}: {
+  players: AnonPlayer[];
+  currentTurnPlayerId: string | null;
+  spinning: boolean;
+}) {
+  const n = Math.max(players.length, 1);
+  const REPS = 7;
+
+  const reel = useMemo(
+    () => Array.from({ length: REPS * n }, (_, i) => players[i % n]),
+    [players, n]
+  );
+
+  const translateY = useSharedValue(SLOT_ITEM_H);
+  const isAnimating = useRef(false);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  useEffect(() => {
+    if (!spinning || !currentTurnPlayerId || isAnimating.current || n === 0) return;
+    const targetIdx = players.findIndex((p) => p.id === currentTurnPlayerId);
+    if (targetIdx < 0) return;
+
+    isAnimating.current = true;
+    const landingIndex = 5 * n + targetIdx;
+    const targetY = SLOT_ITEM_H * (1 - landingIndex);
+
+    translateY.value = withTiming(
+      targetY,
+      { duration: 3200, easing: Easing.out(Easing.cubic) },
+      () => {
+        'worklet';
+        isAnimating.current = false;
+      }
+    );
+  }, [spinning, currentTurnPlayerId]);
+
+  const winnerColor =
+    currentTurnPlayerId
+      ? (players.find((p) => p.id === currentTurnPlayerId)?.color ?? Colors.blue)
+      : Colors.blue;
+
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 28, padding: 24 }}>
+      <Text style={{ color: Colors.text.primary, fontSize: 22, fontFamily: 'Syne_800ExtraBold' }}>
+        🎲 Who's next?
+      </Text>
+
+      {/* Slot window */}
+      <View
+        style={{
+          width: 300,
+          height: SLOT_ITEM_H * SLOT_VISIBLE,
+          overflow: 'hidden',
+          borderRadius: BorderRadius.card,
+          backgroundColor: Colors.bg.card,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.07)',
+        }}
+      >
+        {/* Center highlight band */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: SLOT_ITEM_H,
+            left: 0,
+            right: 0,
+            height: SLOT_ITEM_H,
+            backgroundColor: winnerColor + '14',
+            borderTopWidth: 1.5,
+            borderBottomWidth: 1.5,
+            borderColor: winnerColor + '55',
+            zIndex: 10,
+          }}
+        />
+
+        {/* Top fade */}
+        <LinearGradient
+          colors={[Colors.bg.card, 'transparent']}
+          pointerEvents="none"
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, height: SLOT_ITEM_H, zIndex: 11 }}
+        />
+        {/* Bottom fade */}
+        <LinearGradient
+          colors={['transparent', Colors.bg.card]}
+          pointerEvents="none"
+          style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: SLOT_ITEM_H, zIndex: 11 }}
+        />
+
+        <Animated.View style={animStyle}>
+          {reel.map((player, i) => (
+            <View
+              key={`${i}-${player.id}`}
+              style={{
+                height: SLOT_ITEM_H,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 14,
+                paddingHorizontal: 24,
+              }}
+            >
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: player.color + '22',
+                  borderWidth: 2,
+                  borderColor: player.color,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ color: player.color, fontSize: 18, fontFamily: 'Syne_900Black' }}>
+                  {player.username[0]?.toUpperCase() ?? '?'}
+                </Text>
+              </View>
+              <Text
+                numberOfLines={1}
+                style={{ color: Colors.text.primary, fontSize: 17, fontFamily: 'Syne_800ExtraBold', flex: 1 }}
+              >
+                {player.username}
+              </Text>
+            </View>
+          ))}
+        </Animated.View>
+      </View>
+
+      <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+        {spinning ? 'Selecting a player...' : 'Get ready...'}
+      </Text>
+    </View>
+  );
+}
+
 // ─── SpinPhaseView ────────────────────────────────────────────────────────────
+
+const SLOT_THRESHOLD = 10;
 
 function SpinPhaseView({
   players,
@@ -548,11 +699,22 @@ function SpinPhaseView({
   currentTurnPlayerId: string | null;
 }) {
   const activePlayers = players.filter((p) => !p.isBlackedOut);
+  const displayPlayers = activePlayers.length > 0 ? activePlayers : players;
+
+  if (displayPlayers.length > SLOT_THRESHOLD) {
+    return (
+      <SlotMachineView
+        players={displayPlayers}
+        currentTurnPlayerId={currentTurnPlayerId}
+        spinning={!!currentTurnPlayerId}
+      />
+    );
+  }
 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 24, padding: 20 }}>
       <SpinWheel
-        players={activePlayers.length > 0 ? activePlayers : players}
+        players={displayPlayers}
         targetPlayerId={currentTurnPlayerId}
         spinning={!!currentTurnPlayerId}
         size={270}
