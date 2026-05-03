@@ -401,6 +401,7 @@ export function TruthAnswerView({
 
 // ─── ReactionView ─────────────────────────────────────────────────────────────
 
+
 const EMOJIS = ['😂', '😱', '🔥', '❤️', '💀'] as const;
 
 export function ReactionView({
@@ -413,6 +414,7 @@ export function ReactionView({
   comments,
   phaseEndsAt,
   token,
+  dareResult,
 }: {
   players: AnonPlayer[];
   myPlayer: AnonPlayer | null;
@@ -423,6 +425,7 @@ export function ReactionView({
   comments: Comment[];
   phaseEndsAt: string | null;
   token: string | null;
+  dareResult?: { passed: boolean; yesVotes: number; totalVotes: number } | null;
 }) {
   const [commentText, setCommentText] = useState('');
   const [sending, setSending] = useState(false);
@@ -522,6 +525,30 @@ export function ReactionView({
                 </View>
               )}
             </LinearGradient>
+          )}
+
+          {/* Dare result banner */}
+          {!isTruth && dareResult && (
+            <Animated.View
+              entering={FadeIn.duration(300)}
+              style={{
+                borderRadius: BorderRadius.card,
+                borderWidth: 1,
+                borderColor: dareResult.passed ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+                backgroundColor: dareResult.passed ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+                padding: 14,
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <Text style={{ fontSize: 28 }}>{dareResult.passed ? '✅' : '❌'}</Text>
+              <Text style={{ color: dareResult.passed ? Colors.green : Colors.red, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>
+                {dareResult.passed ? 'Dare Completed!' : 'Dare Failed'}
+              </Text>
+              <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+                {dareResult.yesVotes}/{dareResult.totalVotes} voted yes
+              </Text>
+            </Animated.View>
           )}
 
           {/* Comments */}
@@ -684,5 +711,406 @@ export function ReactionView({
         </View>
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+// ─── DareShowView ─────────────────────────────────────────────────────────────
+
+export function DareShowView({
+  players,
+  currentTurnPlayerId,
+  content,
+  phaseEndsAt,
+}: {
+  players: AnonPlayer[];
+  currentTurnPlayerId: string | null;
+  content: TruthOrDare | null;
+  phaseEndsAt: string | null;
+}) {
+  const turnPlayer = players.find((p) => p.id === currentTurnPlayerId);
+
+  return (
+    <ScrollView
+      contentContainerStyle={{ padding: 20, gap: 20, alignItems: 'center' }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={{ alignItems: 'center', gap: 6, paddingTop: 8 }}>
+        <Text style={{ fontSize: 36 }}>🔥</Text>
+        <Text style={{ color: Colors.text.primary, fontSize: 22, fontFamily: 'Syne_800ExtraBold' }}>
+          Dare!
+        </Text>
+        {turnPlayer && (
+          <Text style={{ color: Colors.text.muted, fontSize: 14, fontFamily: 'Inter_400Regular' }}>
+            <Text style={{ color: turnPlayer.color, fontFamily: 'Inter_600SemiBold' }}>
+              {turnPlayer.username}
+            </Text>{' '}chose Dare
+          </Text>
+        )}
+      </View>
+
+      {content && (
+        <Animated.View entering={FadeIn.duration(400)} style={{ width: '100%' }}>
+          <LinearGradient
+            colors={['rgba(139,92,246,0.15)', 'rgba(139,92,246,0.05)']}
+            style={{
+              borderRadius: BorderRadius.card,
+              borderWidth: 1,
+              borderColor: 'rgba(139,92,246,0.3)',
+              padding: 20,
+              gap: 10,
+            }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ color: 'rgba(139,92,246,0.9)', fontSize: 12, fontFamily: 'Inter_700Bold', letterSpacing: 1 }}>
+                DARE
+              </Text>
+              <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_500Medium' }}>
+                +{content.points} pts
+              </Text>
+            </View>
+            <Text style={{ color: Colors.text.primary, fontSize: 18, fontFamily: 'Syne_800ExtraBold', lineHeight: 26 }}>
+              {content.content}
+            </Text>
+          </LinearGradient>
+        </Animated.View>
+      )}
+
+      <View style={{ alignItems: 'center', gap: 8 }}>
+        <TimerPill endsAt={phaseEndsAt} />
+        <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
+          Voting starts soon...
+        </Text>
+      </View>
+    </ScrollView>
+  );
+}
+
+// ─── DareVoteView ─────────────────────────────────────────────────────────────
+
+export function DareVoteView({
+  players,
+  myPlayer,
+  currentTurnPlayerId,
+  currentRoundId,
+  content,
+  phaseEndsAt,
+  token,
+  votes,
+}: {
+  players: AnonPlayer[];
+  myPlayer: AnonPlayer | null;
+  currentTurnPlayerId: string | null;
+  currentRoundId: string | null;
+  content: TruthOrDare | null;
+  phaseEndsAt: string | null;
+  token: string | null;
+  votes: import('@/types').Vote[];
+}) {
+  const [myVote, setMyVote] = useState<'yes' | 'no' | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const isTarget = myPlayer?.id === currentTurnPlayerId;
+  const turnPlayer = players.find((p) => p.id === currentTurnPlayerId);
+
+  const yesCount = votes.filter((v) => v.value === 'yes').length;
+  const noCount = votes.filter((v) => v.value === 'no').length;
+  const totalVoters = players.filter((p) => p.id !== currentTurnPlayerId).length;
+  const totalVoted = votes.length;
+  const yesRatio = totalVoters > 0 ? yesCount / totalVoters : 0;
+
+  const castVote = useCallback(async (value: 'yes' | 'no') => {
+    if (!currentRoundId || !token || myVote || submitting || isTarget) return;
+    setMyVote(value);
+    setSubmitting(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await fetch(`${API_URL}/game/rounds/${currentRoundId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ value }),
+      });
+    } catch { /* ignore */ } finally {
+      setSubmitting(false);
+    }
+  }, [currentRoundId, token, myVote, submitting, isTarget]);
+
+  return (
+    <ScrollView
+      contentContainerStyle={{ padding: 20, gap: 20 }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ gap: 2 }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 18, fontFamily: 'Syne_800ExtraBold' }}>
+            Did they do it?
+          </Text>
+          {turnPlayer && (
+            <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+              Judge{' '}
+              <Text style={{ color: turnPlayer.color, fontFamily: 'Inter_600SemiBold' }}>
+                {turnPlayer.username}
+              </Text>
+            </Text>
+          )}
+        </View>
+        <TimerPill endsAt={phaseEndsAt} />
+      </View>
+
+      {content && (
+        <LinearGradient
+          colors={['rgba(139,92,246,0.12)', 'rgba(139,92,246,0.05)']}
+          style={{
+            borderRadius: BorderRadius.card,
+            borderWidth: 1,
+            borderColor: 'rgba(139,92,246,0.2)',
+            padding: 16,
+            gap: 8,
+          }}
+        >
+          <Text style={{ color: 'rgba(139,92,246,0.8)', fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 1 }}>
+            DARE
+          </Text>
+          <Text style={{ color: Colors.text.primary, fontSize: 16, fontFamily: 'Syne_800ExtraBold', lineHeight: 22 }}>
+            {content.content}
+          </Text>
+        </LinearGradient>
+      )}
+
+      <View style={{ gap: 10 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_500Medium' }}>
+            {totalVoted}/{totalVoters} voted
+          </Text>
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_500Medium' }}>
+            YES {yesCount} · NO {noCount}
+          </Text>
+        </View>
+        <View style={{ height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
+          <View
+            style={{
+              height: '100%',
+              width: `${yesRatio * 100}%`,
+              backgroundColor: Colors.green,
+              borderRadius: 4,
+            }}
+          />
+        </View>
+      </View>
+
+      {isTarget ? (
+        <View
+          style={{
+            backgroundColor: Colors.bg.card,
+            borderRadius: BorderRadius.card,
+            padding: 20,
+            alignItems: 'center',
+            gap: 6,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.06)',
+          }}
+        >
+          <Text style={{ fontSize: 28 }}>👀</Text>
+          <Text style={{ color: Colors.text.primary, fontSize: 15, fontFamily: 'Syne_800ExtraBold' }}>
+            Class is judging you...
+          </Text>
+          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
+            Did you complete the dare?
+          </Text>
+        </View>
+      ) : myVote ? (
+        <View
+          style={{
+            backgroundColor: myVote === 'yes' ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+            borderRadius: BorderRadius.card,
+            padding: 18,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: myVote === 'yes' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+          }}
+        >
+          <Text style={{ color: myVote === 'yes' ? Colors.green : Colors.red, fontSize: 15, fontFamily: 'Syne_800ExtraBold' }}>
+            {myVote === 'yes' ? '✅ Voted YES' : '❌ Voted NO'}
+          </Text>
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4 }}>
+            Waiting for others...
+          </Text>
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <Pressable onPress={() => castVote('yes')} disabled={submitting} style={{ flex: 1 }}>
+            <LinearGradient
+              colors={['rgba(34,197,94,0.2)', 'rgba(34,197,94,0.08)']}
+              style={{
+                borderRadius: BorderRadius.btn,
+                borderWidth: 1.5,
+                borderColor: 'rgba(34,197,94,0.35)',
+                paddingVertical: 18,
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Text style={{ fontSize: 28 }}>🔥</Text>
+              <Text style={{ color: Colors.green, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>YES</Text>
+              <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_400Regular' }}>They did it</Text>
+            </LinearGradient>
+          </Pressable>
+          <Pressable onPress={() => castVote('no')} disabled={submitting} style={{ flex: 1 }}>
+            <LinearGradient
+              colors={['rgba(239,68,68,0.2)', 'rgba(239,68,68,0.08)']}
+              style={{
+                borderRadius: BorderRadius.btn,
+                borderWidth: 1.5,
+                borderColor: 'rgba(239,68,68,0.35)',
+                paddingVertical: 18,
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Text style={{ fontSize: 28 }}>💀</Text>
+              <Text style={{ color: Colors.red, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>NO</Text>
+              <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_400Regular' }}>They chickened</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+// ─── PunishmentVoteView ───────────────────────────────────────────────────────
+
+export function PunishmentVoteView({
+  players,
+  myPlayer,
+  currentTurnPlayerId,
+  phaseEndsAt,
+  votes,
+}: {
+  players: AnonPlayer[];
+  myPlayer: AnonPlayer | null;
+  currentTurnPlayerId: string | null;
+  phaseEndsAt: string | null;
+  votes: import('@/types').Vote[];
+}) {
+  const [myVote, setMyVote] = useState<'a' | 'b' | null>(null);
+  const turnPlayer = players.find((p) => p.id === currentTurnPlayerId);
+  const isTarget = myPlayer?.id === currentTurnPlayerId;
+
+  const aCount = votes.filter((v) => v.value === 'a').length;
+  const bCount = votes.filter((v) => v.value === 'b').length;
+  const total = votes.length;
+
+  return (
+    <ScrollView
+      contentContainerStyle={{ padding: 20, gap: 20 }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={{ alignItems: 'center', gap: 6 }}>
+        <Text style={{ fontSize: 36 }}>⚡</Text>
+        <Text style={{ color: Colors.text.primary, fontSize: 22, fontFamily: 'Syne_800ExtraBold' }}>
+          Punishment Vote
+        </Text>
+        {turnPlayer && (
+          <Text style={{ color: Colors.text.muted, fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
+            Choose{' '}
+            <Text style={{ color: turnPlayer.color, fontFamily: 'Inter_600SemiBold' }}>
+              {turnPlayer.username}
+            </Text>
+            {"'s"} punishment
+          </Text>
+        )}
+        <TimerPill endsAt={phaseEndsAt} />
+      </View>
+
+      {total > 0 && (
+        <View
+          style={{
+            backgroundColor: Colors.bg.card,
+            borderRadius: BorderRadius.card,
+            padding: 14,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.06)',
+            gap: 8,
+          }}
+        >
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center' }}>
+            {total} vote{total !== 1 ? 's' : ''} cast
+          </Text>
+          <View style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden', flexDirection: 'row' }}>
+            <View style={{ flex: aCount + 0.001, backgroundColor: Colors.blue, borderRadius: 3 }} />
+            <View style={{ flex: bCount + 0.001, backgroundColor: 'rgba(139,92,246,0.7)', borderRadius: 3 }} />
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text style={{ color: Colors.blue, fontSize: 11, fontFamily: 'Inter_700Bold' }}>A · {aCount}</Text>
+            <Text style={{ color: 'rgba(139,92,246,0.9)', fontSize: 11, fontFamily: 'Inter_700Bold' }}>B · {bCount}</Text>
+          </View>
+        </View>
+      )}
+
+      {isTarget ? (
+        <View
+          style={{
+            backgroundColor: Colors.bg.card,
+            borderRadius: BorderRadius.card,
+            padding: 24,
+            alignItems: 'center',
+            gap: 8,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.06)',
+          }}
+        >
+          <Text style={{ fontSize: 32 }}>😬</Text>
+          <Text style={{ color: Colors.text.primary, fontSize: 16, fontFamily: 'Syne_800ExtraBold', textAlign: 'center' }}>
+            Class decides your fate...
+          </Text>
+        </View>
+      ) : myVote ? (
+        <View
+          style={{
+            backgroundColor: Colors.bg.card,
+            borderRadius: BorderRadius.card,
+            padding: 20,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.06)',
+          }}
+        >
+          <Text style={{ color: Colors.text.primary, fontSize: 15, fontFamily: 'Syne_800ExtraBold' }}>
+            Voted {myVote.toUpperCase()}
+          </Text>
+          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 4 }}>
+            Waiting for result...
+          </Text>
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          {(['a', 'b'] as const).map((opt) => (
+            <Pressable
+              key={opt}
+              onPress={() => setMyVote(opt)}
+              style={{ flex: 1 }}
+            >
+              <LinearGradient
+                colors={
+                  opt === 'a'
+                    ? ['rgba(59,130,246,0.2)', 'rgba(59,130,246,0.06)']
+                    : ['rgba(139,92,246,0.2)', 'rgba(139,92,246,0.06)']
+                }
+                style={{
+                  borderRadius: BorderRadius.btn,
+                  borderWidth: 1.5,
+                  borderColor: opt === 'a' ? 'rgba(59,130,246,0.35)' : 'rgba(139,92,246,0.35)',
+                  paddingVertical: 24,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: opt === 'a' ? Colors.blue : 'rgba(139,92,246,0.9)', fontSize: 32, fontFamily: 'Syne_900Black' }}>
+                  {opt.toUpperCase()}
+                </Text>
+              </LinearGradient>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </ScrollView>
   );
 }

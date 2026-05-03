@@ -28,7 +28,14 @@ import { useGameStore } from '@/store/gameStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useGameTimer } from '@/hooks/useGameTimer';
 import { SpinWheel } from '@/components/ui/SpinWheel';
-import { TruthQuestionView, TruthAnswerView, ReactionView } from '@/components/game/GamePhases';
+import {
+  TruthQuestionView,
+  TruthAnswerView,
+  ReactionView,
+  DareShowView,
+  DareVoteView,
+  PunishmentVoteView,
+} from '@/components/game/GamePhases';
 import type { AnonPlayer, WSMessage } from '@/types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
@@ -731,10 +738,12 @@ function ActiveView({
   currentAnswer,
   reactions,
   comments,
+  votes,
   phaseEndsAt,
   isReconnecting,
   token,
   roomCode,
+  dareResult,
 }: {
   players: AnonPlayer[];
   myPlayer: AnonPlayer | null;
@@ -745,12 +754,14 @@ function ActiveView({
   currentAnswer: string | null;
   reactions: import('@/types').Reaction[];
   comments: import('@/types').Comment[];
+  votes: import('@/types').Vote[];
   phaseEndsAt: string | null;
   isReconnecting: boolean;
   token: string | null;
   roomCode: string;
+  dareResult: { passed: boolean; yesVotes: number; totalVotes: number } | null;
 }) {
-  const showStrip = phase !== 'reaction';
+  const showStrip = phase !== 'reaction' && phase !== 'dare_vote' && phase !== 'punishment_vote';
 
   return (
     <View style={{ flex: 1 }}>
@@ -789,6 +800,32 @@ function ActiveView({
           token={token}
           roomCode={roomCode}
         />
+      ) : phase === 'dare_show' ? (
+        <DareShowView
+          players={players}
+          currentTurnPlayerId={currentTurnPlayerId}
+          content={currentContent}
+          phaseEndsAt={phaseEndsAt}
+        />
+      ) : phase === 'dare_vote' ? (
+        <DareVoteView
+          players={players}
+          myPlayer={myPlayer}
+          currentTurnPlayerId={currentTurnPlayerId}
+          currentRoundId={currentRoundId}
+          content={currentContent}
+          phaseEndsAt={phaseEndsAt}
+          token={token}
+          votes={votes}
+        />
+      ) : phase === 'punishment_vote' ? (
+        <PunishmentVoteView
+          players={players}
+          myPlayer={myPlayer}
+          currentTurnPlayerId={currentTurnPlayerId}
+          phaseEndsAt={phaseEndsAt}
+          votes={votes}
+        />
       ) : phase === 'reaction' ? (
         <ReactionView
           players={players}
@@ -800,6 +837,7 @@ function ActiveView({
           comments={comments}
           phaseEndsAt={phaseEndsAt}
           token={token}
+          dareResult={dareResult}
         />
       ) : (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 }}>
@@ -1035,6 +1073,11 @@ export default function GameRoomScreen() {
     name: string;
     phoneLast4: string;
   } | null>(null);
+  const [dareResult, setDareResult] = useState<{
+    passed: boolean;
+    yesVotes: number;
+    totalVotes: number;
+  } | null>(null);
 
   const room = store.room ? mapApiRoom(store.room as unknown as Record<string, unknown>) : null;
   const isHost = !!(user?.id && room?.hostId && user.id === room.hostId);
@@ -1138,6 +1181,7 @@ export default function GameRoomScreen() {
 
         case 'phase_change':
           store.setPhase(d.phase as string, (d.ends_at ?? d.phase_ends_at) as string | undefined);
+          if (d.phase === 'spinning') setDareResult(null);
           break;
 
         case 'content_shown':
@@ -1203,6 +1247,19 @@ export default function GameRoomScreen() {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           break;
         }
+
+        case 'dare_result':
+          setDareResult({
+            passed: d.passed as boolean,
+            yesVotes: (d.yes_votes ?? d.yesVotes) as number,
+            totalVotes: (d.total_votes ?? d.totalVotes) as number,
+          });
+          Haptics.notificationAsync(
+            (d.passed as boolean)
+              ? Haptics.NotificationFeedbackType.Success
+              : Haptics.NotificationFeedbackType.Error
+          );
+          break;
       }
     },
     [store]
@@ -1362,10 +1419,12 @@ export default function GameRoomScreen() {
           currentAnswer={store.currentAnswer}
           reactions={store.reactions}
           comments={store.comments}
+          votes={store.votes}
           phaseEndsAt={store.phaseEndsAt}
           isReconnecting={store.isReconnecting}
           token={token}
           roomCode={code ?? ''}
+          dareResult={dareResult}
         />
       ) : (
         <EndedView
