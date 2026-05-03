@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
   useFonts,
   Syne_800ExtraBold,
@@ -45,6 +46,7 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
+    <ErrorBoundary>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="light" backgroundColor="#0a0e1a" />
       <Stack
@@ -61,5 +63,6 @@ export default function RootLayout() {
         <Stack.Screen name="feed" />
       </Stack>
     </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }

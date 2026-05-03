@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, BorderRadius } from '@/constants/theme';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useAuthStore } from '@/store/authStore';
+import { requestNotificationPermission } from '@/utils/notifications';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
 
@@ -57,9 +58,32 @@ function SettingRow({
 }
 
 export default function SettingsScreen() {
-  const { soundEnabled, vibrationEnabled, theme, setSoundEnabled, setVibrationEnabled, setTheme } =
-    useSettingsStore();
+  const {
+    soundEnabled,
+    vibrationEnabled,
+    theme,
+    notificationsEnabled,
+    setSoundEnabled,
+    setVibrationEnabled,
+    setTheme,
+    setNotificationsEnabled,
+  } = useSettingsStore();
   const { clearUser, token } = useAuthStore();
+
+  const handleNotificationsToggle = async (enabled: boolean) => {
+    if (enabled) {
+      const granted = await requestNotificationPermission();
+      setNotificationsEnabled(granted);
+      if (!granted) {
+        Alert.alert(
+          'Permission Denied',
+          'Enable notifications in your device settings to receive game alerts.'
+        );
+      }
+    } else {
+      setNotificationsEnabled(false);
+    }
+  };
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -137,6 +161,19 @@ export default function SettingsScreen() {
                 <Switch
                   value={theme === 'dark'}
                   onValueChange={(v) => setTheme(v ? 'dark' : 'light')}
+                  trackColor={{ false: '#374151', true: '#3b82f6' }}
+                  thumbColor="#fff"
+                />
+              }
+            />
+            <SettingRow
+              icon="notifications"
+              label="Notifications"
+              sublabel="Game alerts and reminders"
+              right={
+                <Switch
+                  value={notificationsEnabled}
+                  onValueChange={handleNotificationsToggle}
                   trackColor={{ false: '#374151', true: '#3b82f6' }}
                   thumbColor="#fff"
                 />

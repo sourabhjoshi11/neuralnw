@@ -26,9 +26,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { Colors, BorderRadius } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 import { useFeedStore } from '@/store/feedStore';
+import { FeedPaywall } from '@/components/feed/FeedPaywall';
 import type { FeedMessage } from '@/types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
@@ -384,6 +386,7 @@ function MessageBubble({
 // ─── FeedRoomScreen ───────────────────────────────────────────────────────────
 
 export default function FeedRoomScreen() {
+  usePreventScreenCapture();
   const { code } = useLocalSearchParams<{ code: string }>();
   const { token } = useAuthStore();
   const store = useFeedStore();
@@ -394,6 +397,7 @@ export default function FeedRoomScreen() {
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<FeedMessage | null>(null);
   const [reactingTo, setReactingTo] = useState<string | null>(null);
+  const [showPaywall, setShowPaywall] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const loadMessages = useCallback(async (isRefresh = false) => {
@@ -427,7 +431,7 @@ export default function FeedRoomScreen() {
     const trimmed = text.trim();
     if (!trimmed || sending || !token || !code) return;
     if (store.weeklyCount >= store.weeklyLimit) {
-      Alert.alert('Limit reached', 'You\'ve used all 5 messages this week. Upgrade for unlimited.');
+      setShowPaywall(true);
       return;
     }
     setSending(true);
@@ -447,7 +451,7 @@ export default function FeedRoomScreen() {
         store.incrementWeeklyCount();
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
       } else if (res.status === 429) {
-        Alert.alert('Weekly limit reached', 'You have 5 messages per week on the free plan.');
+        setShowPaywall(true);
       } else if (res.status === 422) {
         Alert.alert('Message flagged', 'Your message was flagged by moderation. Keep it appropriate.');
       } else {
@@ -765,6 +769,15 @@ export default function FeedRoomScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <FeedPaywall
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onUpgrade={() => {
+          setShowPaywall(false);
+          router.push('/(tabs)/settings');
+        }}
+      />
     </SafeAreaView>
   );
 }

@@ -41,6 +41,7 @@ import {
   IdentityRevealView,
   PunishmentBanner,
 } from '@/components/game/GamePhases';
+import { AdGate } from '@/components/game/AdGate';
 import type { AnonPlayer, WSMessage } from '@/types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
@@ -1317,6 +1318,7 @@ export default function GameRoomScreen() {
     a: string;
     b: string;
   } | null>(null);
+  const [showAdGate, setShowAdGate] = useState(false);
 
   const room = store.room ? mapApiRoom(store.room as unknown as Record<string, unknown>) : null;
   const isHost = !!(user?.id && room?.hostId && user.id === room.hostId);
@@ -1405,6 +1407,7 @@ export default function GameRoomScreen() {
           if (d.color_map) store.updateColorMap(d.color_map as Record<string, string>);
           store.setPhase('spinning');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          if (!user?.isPremium) setShowAdGate(true);
           break;
         }
         case 'spin_start':
@@ -1708,6 +1711,8 @@ export default function GameRoomScreen() {
           lastPlaceReveal={lastPlaceReveal}
         />
       )}
+
+      <AdGate visible={showAdGate} onDismiss={() => setShowAdGate(false)} />
     </SafeAreaView>
   );
 }
