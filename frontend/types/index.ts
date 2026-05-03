@@ -31,7 +31,6 @@ export type Room = {
   startsAt: string | null;
   endsAt: string | null;
   playerCount: number;
-  maxPlayers: number;
   currentTurn: string | null;
   createdAt: string;
 };
