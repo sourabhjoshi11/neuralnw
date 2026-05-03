@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  Share,
   StatusBar,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -1218,6 +1219,43 @@ function EndedView({
           </View>
         </View>
       )}
+
+      {/* Share button */}
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          const medals = ['🥇', '🥈', '🥉'];
+          const lines = sorted.map((p, i) =>
+            `${i < 3 ? medals[i] : `${i + 1}.`} ${p.username} — ${p.points}pt`
+          );
+          const reveal = lastPlaceReveal
+            ? `\n💀 Last place revealed: ${lastPlaceReveal.name} (···${lastPlaceReveal.phoneLast4})`
+            : '';
+          Share.share({
+            message: `🍾 ClassChaos Results\n\n${lines.join('\n')}${reveal}\n\nPlay now: classchaos.app`,
+          });
+        }}
+      >
+        <LinearGradient
+          colors={['#3b82f6', '#06b6d4']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            borderRadius: BorderRadius.btn,
+            paddingVertical: 15,
+            alignItems: 'center',
+            shadowColor: '#3b82f6',
+            shadowOpacity: 0.4,
+            shadowRadius: 16,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 8,
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 15, fontFamily: 'Syne_800ExtraBold' }}>
+            📤 Share Results
+          </Text>
+        </LinearGradient>
+      </Pressable>
 
       {/* Leave */}
       <Pressable

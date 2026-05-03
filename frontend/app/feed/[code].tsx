@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,15 @@ import {
   StatusBar,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  withDelay,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -71,6 +79,71 @@ function mapMessage(m: Record<string, unknown>): FeedMessage {
 }
 
 const REACT_EMOJIS = ['😂', '🔥', '💀', '❤️', '😱', '👀'];
+
+// ─── TypingIndicator ─────────────────────────────────────────────────────────
+
+function TypingDot({ delay }: { delay: number }) {
+  const y = useSharedValue(0);
+  useEffect(() => {
+    y.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(-5, { duration: 300 }),
+          withTiming(0, { duration: 300 })
+        ),
+        -1,
+        false
+      )
+    );
+  }, []);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
+  return (
+    <Animated.View
+      style={[{ width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.text.muted }, style]}
+    />
+  );
+}
+
+function TypingIndicator({ users }: { users: { id: string; username: string }[] }) {
+  const label =
+    users.length === 1
+      ? `${users[0].username || 'Someone'} is typing`
+      : `${users.length} people are typing`;
+  return (
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          backgroundColor: Colors.bg.card,
+          borderRadius: 14,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.06)',
+        }}
+      >
+        <TypingDot delay={0} />
+        <TypingDot delay={150} />
+        <TypingDot delay={300} />
+      </View>
+      <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+        {label}
+      </Text>
+    </Animated.View>
+  );
+}
 
 // ─── MessageBubble ────────────────────────────────────────────────────────────
 
@@ -406,6 +479,20 @@ export default function FeedRoomScreen() {
     (m) => m.expiresAt && new Date(m.expiresAt).getTime() > now
   );
 
+  // Unique senders from recent messages for stories row
+  const storyUsers = useMemo(() => {
+    const seen = new Set<string>();
+    const result: { senderId: string; username: string }[] = [];
+    for (const m of [...messages].reverse()) {
+      if (!seen.has(m.senderId)) {
+        seen.add(m.senderId);
+        result.push({ senderId: m.senderId, username: m.username });
+        if (result.length >= 12) break;
+      }
+    }
+    return result;
+  }, [messages]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg.primary }}>
       <StatusBar barStyle="light-content" />
@@ -442,6 +529,62 @@ export default function FeedRoomScreen() {
           <Ionicons name="refresh" size={18} color={Colors.text.muted} />
         </Pressable>
       </View>
+
+      {/* Stories row */}
+      {storyUsers.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 14 }}
+          style={{ borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' }}
+        >
+          {storyUsers.map(({ senderId, username }) => {
+            const color = colorForSender(senderId);
+            const isMe = senderId === store.myMemberId;
+            const label = username || `anon·${senderId.slice(-4)}`;
+            return (
+              <View key={senderId} style={{ alignItems: 'center', gap: 5 }}>
+                <LinearGradient
+                  colors={[color, color + '88']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    padding: 2.5,
+                  }}
+                >
+                  <View
+                    style={{
+                      flex: 1,
+                      borderRadius: 24,
+                      backgroundColor: Colors.bg.card,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ color, fontSize: 18, fontFamily: 'Syne_900Black' }}>
+                      {label[0]?.toUpperCase() ?? '?'}
+                    </Text>
+                  </View>
+                </LinearGradient>
+                <Text
+                  style={{
+                    color: isMe ? Colors.cyan : Colors.text.muted,
+                    fontSize: 9,
+                    fontFamily: 'Inter_500Medium',
+                    maxWidth: 52,
+                  }}
+                  numberOfLines={1}
+                >
+                  {isMe ? 'You' : label.split('·')[0]}
+                </Text>
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -502,6 +645,11 @@ export default function FeedRoomScreen() {
               })
             )}
           </ScrollView>
+        )}
+
+        {/* Typing indicator */}
+        {store.typingUsers.length > 0 && (
+          <TypingIndicator users={store.typingUsers} />
         )}
 
         {/* Bottom bar */}
