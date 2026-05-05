@@ -90,7 +90,7 @@ export default function GamesScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg.primary }}>
       <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} showsVerticalScrollIndicator={false}>
         <Animated.View style={titleStyle}>
-          <Text style={{ color: Colors.text.primary, fontSize: 28, fontFamily: 'Syne_900Black', letterSpacing: -0.5 }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 28, fontFamily: 'Syne_800ExtraBold', letterSpacing: -0.5 }}>
             Game Rooms
           </Text>
           <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 4 }}>

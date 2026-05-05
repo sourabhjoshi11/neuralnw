@@ -110,7 +110,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg.primary }}>
       <ScrollView contentContainerStyle={{ padding: 20, gap: 24 }} showsVerticalScrollIndicator={false}>
-        <Text style={{ color: Colors.text.primary, fontSize: 28, fontFamily: 'Syne_900Black' }}>
+        <Text style={{ color: Colors.text.primary, fontSize: 28, fontFamily: 'Syne_800ExtraBold' }}>
           Settings
         </Text>
 

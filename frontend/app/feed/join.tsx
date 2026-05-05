@@ -50,7 +50,7 @@ export default function JoinFeedScreen() {
           <Pressable onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={Colors.text.secondary} />
           </Pressable>
-          <Text style={{ color: Colors.text.primary, fontSize: 24, fontFamily: 'Syne_900Black' }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 24, fontFamily: 'Syne_800ExtraBold' }}>
             Join Class Feed
           </Text>
         </View>

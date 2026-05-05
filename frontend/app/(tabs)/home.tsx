@@ -204,7 +204,7 @@ export default function HomeScreen() {
             <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
               Welcome back 👋
             </Text>
-            <Text style={{ color: Colors.text.primary, fontSize: 26, fontFamily: 'Syne_900Black', letterSpacing: -0.5 }}>
+            <Text style={{ color: Colors.text.primary, fontSize: 26, fontFamily: 'Syne_800ExtraBold', letterSpacing: -0.5 }}>
               Anonymous
             </Text>
           </View>

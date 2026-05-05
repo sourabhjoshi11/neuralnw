@@ -568,7 +568,7 @@ export default function FeedRoomScreen() {
                       justifyContent: 'center',
                     }}
                   >
-                    <Text style={{ color, fontSize: 18, fontFamily: 'Syne_900Black' }}>
+                    <Text style={{ color, fontSize: 18, fontFamily: 'Syne_800ExtraBold' }}>
                       {label[0]?.toUpperCase() ?? '?'}
                     </Text>
                   </View>

@@ -120,7 +120,7 @@ export function AdGate({ visible, onDismiss }: { visible: boolean; onDismiss: ()
               justifyContent: 'center',
             }}
           >
-            <Text style={{ color: Colors.blue, fontSize: 24, fontFamily: 'Syne_900Black' }}>
+            <Text style={{ color: Colors.blue, fontSize: 24, fontFamily: 'Syne_800ExtraBold' }}>
               {countdown}
             </Text>
           </View>

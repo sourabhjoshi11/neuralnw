@@ -42,7 +42,7 @@ import {
   PunishmentBanner,
 } from '@/components/game/GamePhases';
 import { AdGate } from '@/components/game/AdGate';
-import type { AnonPlayer, WSMessage } from '@/types';
+import type { AnonPlayer, WSMessage, GamePhase } from '@/types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
 
@@ -286,7 +286,7 @@ function LobbyView({
             style={{
               color: Colors.text.primary,
               fontSize: 48,
-              fontFamily: 'Syne_900Black',
+              fontFamily: 'Syne_800ExtraBold',
               letterSpacing: 10,
             }}
           >
@@ -665,7 +665,7 @@ function SlotMachineView({
                   justifyContent: 'center',
                 }}
               >
-                <Text style={{ color: player.color, fontSize: 18, fontFamily: 'Syne_900Black' }}>
+                <Text style={{ color: player.color, fontSize: 18, fontFamily: 'Syne_800ExtraBold' }}>
                   {player.username[0]?.toUpperCase() ?? '?'}
                 </Text>
               </View>
@@ -789,11 +789,11 @@ function ChoicePhaseView({
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ color: turnPlayer.color, fontSize: 26, fontFamily: 'Syne_900Black' }}>
+              <Text style={{ color: turnPlayer.color, fontSize: 26, fontFamily: 'Syne_800ExtraBold' }}>
                 {turnPlayer.username[0]?.toUpperCase()}
               </Text>
             </View>
-            <Text style={{ color: turnPlayer.color, fontSize: 20, fontFamily: 'Syne_900Black' }}>
+            <Text style={{ color: turnPlayer.color, fontSize: 20, fontFamily: 'Syne_800ExtraBold' }}>
               {isMyTurn ? 'Your turn!' : `${turnPlayer.username}'s turn`}
             </Text>
           </View>
@@ -829,7 +829,7 @@ function ChoicePhaseView({
                     }}
                   >
                     <Text style={{ fontSize: 36 }}>🎯</Text>
-                    <Text style={{ color: '#fff', fontSize: 18, fontFamily: 'Syne_900Black' }}>Truth</Text>
+                    <Text style={{ color: '#fff', fontSize: 18, fontFamily: 'Syne_800ExtraBold' }}>Truth</Text>
                     <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontFamily: 'Inter_400Regular' }}>+10 pts</Text>
                   </LinearGradient>
                 </Animated.View>
@@ -859,7 +859,7 @@ function ChoicePhaseView({
                     }}
                   >
                     <Text style={{ fontSize: 36 }}>🔥</Text>
-                    <Text style={{ color: '#fff', fontSize: 18, fontFamily: 'Syne_900Black' }}>Dare</Text>
+                    <Text style={{ color: '#fff', fontSize: 18, fontFamily: 'Syne_800ExtraBold' }}>Dare</Text>
                     <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontFamily: 'Inter_400Regular' }}>+20 pts</Text>
                   </LinearGradient>
                 </Animated.View>
@@ -1065,7 +1065,7 @@ function EndedView({
       <View style={{ alignItems: 'center', gap: 8, paddingTop: 12 }}>
         <Text style={{ fontSize: 56 }}>🏆</Text>
         <Text
-          style={{ color: Colors.text.primary, fontSize: 32, fontFamily: 'Syne_900Black' }}
+          style={{ color: Colors.text.primary, fontSize: 32, fontFamily: 'Syne_800ExtraBold' }}
         >
           Game Over!
         </Text>
@@ -1208,7 +1208,7 @@ function EndedView({
             }}
           >
             <Text
-              style={{ color: Colors.text.primary, fontSize: 22, fontFamily: 'Syne_900Black' }}
+              style={{ color: Colors.text.primary, fontSize: 22, fontFamily: 'Syne_800ExtraBold' }}
             >
               {lastPlaceReveal.name}
             </Text>
@@ -1372,7 +1372,7 @@ export default function GameRoomScreen() {
           const round = d.round as Record<string, unknown> | null | undefined;
           if (round) {
             store.setPhase(
-              round.phase as string,
+              round.phase as GamePhase,
               round.phase_ends_at as string | undefined
             );
             store.setCurrentTurn(round.player_id as string);
@@ -1418,11 +1418,11 @@ export default function GameRoomScreen() {
         case 'spin_result':
           store.setCurrentTurn(d.target_player_id as string);
           store.setCurrentRoundId(d.round_id as string);
-          store.setPhase(d.phase as string, d.phase_ends_at as string | undefined);
+          store.setPhase(d.phase as GamePhase, d.phase_ends_at as string | undefined);
           break;
 
         case 'phase_change':
-          store.setPhase(d.phase as string, (d.ends_at ?? d.phase_ends_at) as string | undefined);
+          store.setPhase(d.phase as GamePhase, (d.ends_at ?? d.phase_ends_at) as string | undefined);
           if (d.phase === 'spinning') {
             setDareResult(null);
             setIdentityReveal(null);
@@ -1436,7 +1436,7 @@ export default function GameRoomScreen() {
 
         case 'content_shown':
           store.setCurrentContent(d.content as never);
-          store.setPhase(d.phase as string, d.phase_ends_at as string | undefined);
+          store.setPhase(d.phase as GamePhase, d.phase_ends_at as string | undefined);
           break;
 
         case 'answer_submitted':

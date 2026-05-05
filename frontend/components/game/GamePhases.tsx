@@ -88,7 +88,7 @@ function PlayerAvatar({
         style={{
           color: player.color,
           fontSize: size * 0.38,
-          fontFamily: 'Syne_900Black',
+          fontFamily: 'Syne_800ExtraBold',
         }}
       >
         {player.username[0]?.toUpperCase() ?? '?'}
@@ -1107,7 +1107,7 @@ export function PunishmentVoteView({
                   alignItems: 'center',
                 }}
               >
-                <Text style={{ color: opt === 'a' ? Colors.blue : 'rgba(139,92,246,0.9)', fontSize: 28, fontFamily: 'Syne_900Black' }}>
+                <Text style={{ color: opt === 'a' ? Colors.blue : 'rgba(139,92,246,0.9)', fontSize: 28, fontFamily: 'Syne_800ExtraBold' }}>
                   {opt.toUpperCase()}
                 </Text>
                 <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 8 }}>

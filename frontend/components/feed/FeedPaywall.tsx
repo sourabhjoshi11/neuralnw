@@ -71,7 +71,7 @@ export function FeedPaywall({
                 style={{
                   color: Colors.text.primary,
                   fontSize: 20,
-                  fontFamily: 'Syne_900Black',
+                  fontFamily: 'Syne_800ExtraBold',
                   textAlign: 'center',
                 }}
               >
@@ -169,7 +169,7 @@ export function FeedPaywall({
                 <Text style={{ fontSize: 26 }}>⭐</Text>
                 <View style={{ flex: 1 }}>
                   <Text
-                    style={{ color: '#fff', fontSize: 15, fontFamily: 'Syne_900Black' }}
+                    style={{ color: '#fff', fontSize: 15, fontFamily: 'Syne_800ExtraBold' }}
                   >
                     Go Premium
                   </Text>

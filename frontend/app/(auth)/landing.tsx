@@ -224,10 +224,10 @@ export default function LandingScreen() {
         {/* Wordmark */}
         <Animated.View style={[{ alignItems: 'center', gap: 10 }, titleStyle]}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ color: '#f1f5f9', fontSize: 46, fontFamily: 'Syne_900Black', letterSpacing: -1 }}>
+            <Text style={{ color: '#f1f5f9', fontSize: 46, fontFamily: 'Syne_800ExtraBold', letterSpacing: -1 }}>
               Class
             </Text>
-            <Text style={{ fontSize: 46, fontFamily: 'Syne_900Black', color: '#3b82f6', letterSpacing: -1 }}>
+            <Text style={{ fontSize: 46, fontFamily: 'Syne_800ExtraBold', color: '#3b82f6', letterSpacing: -1 }}>
               CHAOS
             </Text>
           </View>

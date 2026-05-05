@@ -7,7 +7,6 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
   useFonts,
   Syne_800ExtraBold,
-  Syne_900Black,
 } from '@expo-google-fonts/syne';
 import {
   Inter_400Regular,
@@ -28,7 +27,6 @@ export default function RootLayout() {
 
   const [fontsLoaded] = useFonts({
     Syne_800ExtraBold,
-    Syne_900Black,
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,

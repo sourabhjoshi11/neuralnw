@@ -116,7 +116,7 @@ export default function OtpScreen() {
     >
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 32 }}>
         <View style={{ gap: 8 }}>
-          <Text style={{ color: Colors.text.primary, fontSize: 32, fontFamily: 'Syne_900Black' }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 32, fontFamily: 'Syne_800ExtraBold' }}>
             Verify OTP
           </Text>
           <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Inter_400Regular' }}>
