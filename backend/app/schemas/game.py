@@ -8,8 +8,8 @@ class CreateRoomRequest(BaseModel):
     @field_validator("duration_minutes")
     @classmethod
     def validate_duration(cls, v: int) -> int:
-        if v not in (15, 30, 45, 60):
-            raise ValueError("Duration must be 15, 30, 45, or 60 minutes")
+        if not (5 <= v <= 120):
+            raise ValueError("Duration must be between 5 and 120 minutes")
         return v
 
 
@@ -49,6 +49,17 @@ class VoteRequest(BaseModel):
         return v
 
 
+class PunishmentVoteRequest(BaseModel):
+    value: str
+
+    @field_validator("value")
+    @classmethod
+    def validate_value(cls, v: str) -> str:
+        if v not in ("a", "b"):
+            raise ValueError("Punishment vote must be 'a' or 'b'")
+        return v
+
+
 class ReactionRequest(BaseModel):
     emoji: str
 
@@ -58,6 +69,31 @@ class ReactionRequest(BaseModel):
         v = v.strip()
         if not v or len(v) > 4:
             raise ValueError("Invalid emoji")
+        return v
+
+
+class CustomVoteRequest(BaseModel):
+    value: str
+
+    @field_validator("value")
+    @classmethod
+    def validate_value(cls, v: str) -> str:
+        if v not in ("yes", "no"):
+            raise ValueError("Vote must be 'yes' or 'no'")
+        return v
+
+
+class CustomQuestionRequest(BaseModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Question cannot be empty")
+        if len(v) > 300:
+            raise ValueError("Question too long (max 300 chars)")
         return v
 
 

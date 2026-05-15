@@ -18,8 +18,25 @@ _WHEEL_COLORS = [
 ]
 
 
-def generate_username() -> str:
-    return random.choice(_NOUNS)
+def generate_username(exclude: set[str] | None = None) -> str:
+    """Generate a unique-ish username. Tries adjective+noun combos first,
+    then falls back to appending a number if all combos are exhausted."""
+    exclude = exclude or set()
+    # Shuffle to reduce predictable patterns
+    attempts = [
+        f"{adj}{noun}"
+        for adj in random.sample(_ADJECTIVES, len(_ADJECTIVES))
+        for noun in random.sample(_NOUNS, len(_NOUNS))
+    ]
+    for name in attempts:
+        if name not in exclude:
+            return name
+    # All 280 combos taken (shouldn't happen with ≤20 players) — append number
+    base = f"{random.choice(_ADJECTIVES)}{random.choice(_NOUNS)}"
+    suffix = 2
+    while f"{base}{suffix}" in exclude:
+        suffix += 1
+    return f"{base}{suffix}"
 
 
 def pick_color(used_colors: list[str]) -> str:

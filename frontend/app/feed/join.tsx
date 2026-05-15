@@ -14,7 +14,7 @@ export default function JoinFeedScreen() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { token } = useAuthStore();
-  const { setFeed, setMyMemberId } = useFeedStore();
+  const { setFeed, setMyMemberId, addMyFeed } = useFeedStore();
   const scale = useSharedValue(1);
   const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -35,6 +35,7 @@ export default function JoinFeedScreen() {
       }
       setFeed(data.feed);
       setMyMemberId(data.member.id);
+      addMyFeed(data.feed);
       router.push(`/feed/${data.feed.code}`);
     } catch {
       Alert.alert('Error', 'Network error. Please try again.');
@@ -45,18 +46,18 @@ export default function JoinFeedScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg.primary }}>
-      <View style={{ flex: 1, padding: 20, gap: 28, justifyContent: 'center' }}>
+      <View style={{ flex: 1, padding: 20, gap: 28 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Pressable onPress={() => router.back()}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/feed')}>
             <Ionicons name="arrow-back" size={24} color={Colors.text.secondary} />
           </Pressable>
-          <Text style={{ color: Colors.text.primary, fontSize: 24, fontFamily: 'Syne_800ExtraBold' }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 24, fontFamily: 'Poppins_700Bold' }}>
             Join Class Feed
           </Text>
         </View>
 
         <View style={{ gap: 12 }}>
-          <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
+          <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Poppins_400Regular', textAlign: 'center' }}>
             Enter the 8-character feed code
           </Text>
           <TextInput
@@ -67,7 +68,7 @@ export default function JoinFeedScreen() {
               borderColor: code ? 'rgba(6,182,212,0.4)' : 'rgba(255,255,255,0.07)',
               color: Colors.text.primary,
               fontSize: 24,
-              fontFamily: 'Inter_700Bold',
+              fontFamily: 'Poppins_700Bold',
               paddingHorizontal: 20,
               paddingVertical: 16,
               textAlign: 'center',
@@ -105,7 +106,7 @@ export default function JoinFeedScreen() {
                 elevation: isValid ? 8 : 0,
               }}
             >
-              <Text style={{ color: isValid ? '#fff' : Colors.text.muted, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>
+              <Text style={{ color: isValid ? '#fff' : Colors.text.muted, fontSize: 16, fontFamily: 'Poppins_700Bold' }}>
                 {loading ? 'Joining...' : 'Join Feed →'}
               </Text>
             </LinearGradient>

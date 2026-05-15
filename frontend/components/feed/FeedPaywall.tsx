@@ -71,7 +71,7 @@ export function FeedPaywall({
                 style={{
                   color: Colors.text.primary,
                   fontSize: 20,
-                  fontFamily: 'Syne_800ExtraBold',
+                  fontFamily: 'Poppins_700Bold',
                   textAlign: 'center',
                 }}
               >
@@ -81,7 +81,7 @@ export function FeedPaywall({
                 style={{
                   color: Colors.text.secondary,
                   fontSize: 14,
-                  fontFamily: 'Inter_400Regular',
+                  fontFamily: 'Poppins_400Regular',
                   textAlign: 'center',
                   lineHeight: 22,
                 }}
@@ -111,7 +111,7 @@ export function FeedPaywall({
                     style={{
                       color: Colors.text.primary,
                       fontSize: 15,
-                      fontFamily: 'Syne_800ExtraBold',
+                      fontFamily: 'Poppins_700Bold',
                     }}
                   >
                     Watch a short ad
@@ -120,7 +120,7 @@ export function FeedPaywall({
                     style={{
                       color: Colors.text.muted,
                       fontSize: 12,
-                      fontFamily: 'Inter_400Regular',
+                      fontFamily: 'Poppins_400Regular',
                     }}
                   >
                     Get +3 messages this week
@@ -138,7 +138,7 @@ export function FeedPaywall({
                     style={{
                       color: Colors.blue,
                       fontSize: 13,
-                      fontFamily: 'Inter_700Bold',
+                      fontFamily: 'Poppins_700Bold',
                     }}
                   >
                     +3
@@ -169,7 +169,7 @@ export function FeedPaywall({
                 <Text style={{ fontSize: 26 }}>⭐</Text>
                 <View style={{ flex: 1 }}>
                   <Text
-                    style={{ color: '#fff', fontSize: 15, fontFamily: 'Syne_800ExtraBold' }}
+                    style={{ color: '#fff', fontSize: 15, fontFamily: 'Poppins_700Bold' }}
                   >
                     Go Premium
                   </Text>
@@ -177,7 +177,7 @@ export function FeedPaywall({
                     style={{
                       color: 'rgba(255,255,255,0.75)',
                       fontSize: 12,
-                      fontFamily: 'Inter_400Regular',
+                      fontFamily: 'Poppins_400Regular',
                     }}
                   >
                     Unlimited messages · No ads · ₹29/month
@@ -191,7 +191,7 @@ export function FeedPaywall({
                 style={{
                   color: Colors.text.muted,
                   fontSize: 13,
-                  fontFamily: 'Inter_400Regular',
+                  fontFamily: 'Poppins_400Regular',
                 }}
               >
                 Maybe later

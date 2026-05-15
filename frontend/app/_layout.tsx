@@ -1,19 +1,19 @@
 import '../global.css';
+import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
+
+configureReanimatedLogger({ level: ReanimatedLogLevel.warn, strict: false });
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
   useFonts,
-  Syne_800ExtraBold,
-} from '@expo-google-fonts/syne';
-import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from '@expo-google-fonts/inter';
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+} from '@expo-google-fonts/poppins';
 import * as SplashScreen from 'expo-splash-screen';
 import { useSession } from '@/hooks/useSession';
 import { useAuthStore } from '@/store/authStore';
@@ -25,15 +25,14 @@ export default function RootLayout() {
 
   const isLoading = useAuthStore((s) => s.isLoading);
 
-  const [fontsLoaded] = useFonts({
-    Syne_800ExtraBold,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+  const [fontsLoaded, fontError] = useFonts({
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
   });
 
-  const ready = fontsLoaded && !isLoading;
+  const ready = (fontsLoaded || !!fontError) && !isLoading;
 
   useEffect(() => {
     if (ready) {

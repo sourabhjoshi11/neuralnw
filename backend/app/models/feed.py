@@ -19,6 +19,7 @@ class Feed(Base):
     admin_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     member_count: Mapped[int] = mapped_column(Integer, default=1)
+    pinned_message_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -47,5 +48,7 @@ class FeedMessage(Base):
     reply_to_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("feed_messages.id"), nullable=True)
     reactions: Mapped[dict] = mapped_column(JSON, default=dict)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

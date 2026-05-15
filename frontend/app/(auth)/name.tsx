@@ -50,10 +50,10 @@ export default function NameScreen() {
     >
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 32 }}>
         <View style={{ gap: 8 }}>
-          <Text style={{ color: Colors.text.primary, fontSize: 32, fontFamily: 'Syne_800ExtraBold' }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 32, fontFamily: 'Poppins_700Bold' }}>
             What's your name?
           </Text>
-          <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Inter_400Regular' }}>
+          <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Poppins_400Regular' }}>
             Your real name is kept private. Only shown if identity is revealed.
           </Text>
         </View>
@@ -66,7 +66,7 @@ export default function NameScreen() {
             borderColor: name ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.07)',
             color: Colors.text.primary,
             fontSize: 18,
-            fontFamily: 'Inter_500Medium',
+            fontFamily: 'Poppins_500Medium',
             paddingHorizontal: 16,
             paddingVertical: 14,
           }}
@@ -102,7 +102,7 @@ export default function NameScreen() {
                 elevation: isValid ? 8 : 0,
               }}
             >
-              <Text style={{ color: isValid ? '#fff' : Colors.text.muted, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>
+              <Text style={{ color: isValid ? '#fff' : Colors.text.muted, fontSize: 16, fontFamily: 'Poppins_700Bold' }}>
                 {loading ? 'Saving...' : "Let's Go! 🎲"}
               </Text>
             </LinearGradient>
@@ -118,7 +118,7 @@ export default function NameScreen() {
             borderColor: 'rgba(255,255,255,0.06)',
           }}
         >
-          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Poppins_400Regular', lineHeight: 18 }}>
             🔒 Your real name is encrypted and only revealed in extreme circumstances (3-strike rule). In all games you'll be anonymous.
           </Text>
         </View>

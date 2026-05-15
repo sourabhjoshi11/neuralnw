@@ -8,9 +8,10 @@ import Animated, {
   withDelay,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+
 import { Card, Badge, GradientButton } from '@/components/ui';
 import { Colors, BorderRadius, SpringConfig } from '@/constants/theme';
+import { Haptics, shareText, copyToClipboard } from '@/utils/compat';
 import { useAuthStore } from '@/store/authStore';
 
 const ANON_AVATARS = ['🦊', '🐼', '🦁', '🐸', '🐯', '🦄', '🐙', '🦋', '🐧', '🦝'];
@@ -69,7 +70,7 @@ function GameCard({
     <Animated.View style={animStyle}>
       <Pressable
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          Haptics.light();
           onPress();
         }}
         onPressIn={() => { scale.value = withSpring(0.97, SpringConfig.snappy); }}
@@ -97,10 +98,10 @@ function GameCard({
               </View>
 
               <View style={{ gap: 4 }}>
-                <Text style={{ color: Colors.text.primary, fontSize: 20, fontFamily: 'Syne_800ExtraBold' }}>
+                <Text style={{ color: Colors.text.primary, fontSize: 20, fontFamily: 'Poppins_700Bold' }}>
                   {title}
                 </Text>
-                <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 }}>
+                <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Poppins_400Regular', lineHeight: 19 }}>
                   {subtitle}
                 </Text>
               </View>
@@ -109,7 +110,7 @@ function GameCard({
                 <Pressable
                   style={{ flex: 1 }}
                   onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    Haptics.medium();
                     onPress();
                   }}
                 >
@@ -128,7 +129,7 @@ function GameCard({
                       elevation: 6,
                     }}
                   >
-                    <Text style={{ color: '#fff', fontSize: 13, fontFamily: 'Syne_800ExtraBold' }}>
+                    <Text style={{ color: '#fff', fontSize: 13, fontFamily: 'Poppins_700Bold' }}>
                       Create
                     </Text>
                   </LinearGradient>
@@ -137,7 +138,7 @@ function GameCard({
                   <Pressable
                     style={{ flex: 1 }}
                     onPress={() => {
-                      Haptics.selectionAsync();
+                      Haptics.selection();
                       onPressSecondary.onPress();
                     }}
                   >
@@ -151,7 +152,7 @@ function GameCard({
                         borderColor: 'rgba(255,255,255,0.1)',
                       }}
                     >
-                      <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
+                      <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Poppins_600SemiBold' }}>
                         {onPressSecondary.label}
                       </Text>
                     </View>
@@ -182,7 +183,7 @@ function StatPill({ emoji, label }: { emoji: string; label: string }) {
       }}
     >
       <Text style={{ fontSize: 14 }}>{emoji}</Text>
-      <Text style={{ color: Colors.text.secondary, fontSize: 12, fontFamily: 'Inter_500Medium' }}>{label}</Text>
+      <Text style={{ color: Colors.text.secondary, fontSize: 12, fontFamily: 'Poppins_500Medium' }}>{label}</Text>
     </View>
   );
 }
@@ -201,15 +202,15 @@ export default function HomeScreen() {
         {/* Header */}
         <Animated.View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, anims[0]]}>
           <View style={{ gap: 2 }}>
-            <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+            <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular' }}>
               Welcome back 👋
             </Text>
-            <Text style={{ color: Colors.text.primary, fontSize: 26, fontFamily: 'Syne_800ExtraBold', letterSpacing: -0.5 }}>
+            <Text style={{ color: Colors.text.primary, fontSize: 26, fontFamily: 'Poppins_700Bold', letterSpacing: -0.5 }}>
               Anonymous
             </Text>
           </View>
           <Pressable
-            onPress={() => Haptics.selectionAsync()}
+            onPress={() => Haptics.selection()}
             style={{
               width: 46,
               height: 46,
@@ -238,7 +239,7 @@ export default function HomeScreen() {
 
         {/* Section label */}
         <Animated.View style={anims[4]}>
-          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>
             Choose Your Game
           </Text>
         </Animated.View>
@@ -270,7 +271,7 @@ export default function HomeScreen() {
 
         {/* Quick actions */}
         <Animated.View style={[{ gap: 10 }, anims[5]]}>
-          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>
             Quick Join
           </Text>
           <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -282,7 +283,7 @@ export default function HomeScreen() {
                 key={route}
                 style={{ flex: 1 }}
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  Haptics.light();
                   router.push(route as any);
                 }}
               >
@@ -298,7 +299,7 @@ export default function HomeScreen() {
                   }}
                 >
                   <Text style={{ fontSize: 28 }}>{emoji}</Text>
-                  <Text style={{ color: color, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
+                  <Text style={{ color: color, fontSize: 13, fontFamily: 'Poppins_600SemiBold' }}>
                     {label}
                   </Text>
                 </View>

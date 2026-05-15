@@ -6,6 +6,7 @@ export default function FeedLayout() {
       <Stack.Screen name="create" />
       <Stack.Screen name="join" />
       <Stack.Screen name="[code]" />
+      <Stack.Screen name="info/[code]" />
     </Stack>
   );
 }

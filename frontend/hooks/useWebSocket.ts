@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 import { useGameStore } from '@/store/gameStore';
 import type { WSMessage } from '@/types';
 
@@ -110,13 +110,16 @@ export function useWebSocket({
       }
     };
 
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    // AppState not available on web
+    const subscription = Platform.OS !== 'web'
+      ? AppState.addEventListener('change', handleAppStateChange)
+      : null;
 
     return () => {
       mountedRef.current = false;
       clearTimers();
       wsRef.current?.close();
-      subscription.remove();
+      subscription?.remove();
     };
   }, []);
 

@@ -19,8 +19,13 @@ limiter = Limiter(key_func=get_remote_address)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("✅ Database connected and tables ready")
+    except Exception as e:
+        print(f"⚠️  Database connection failed at startup: {e}")
+        print("   Server will start anyway — check DB connection / Supabase project status")
     yield
     await engine.dispose()
 
@@ -39,6 +44,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
+    # Also allow any local network origin (localhost, 192.168.x.x, 10.x.x.x) for dev
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

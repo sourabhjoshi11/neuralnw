@@ -11,7 +11,6 @@ passlib[bcrypt]==1.7.4
 python-multipart==0.0.17
 httpx==0.28.0
 openai==1.57.4
-twilio==9.4.0
 cryptography==43.0.3
 python-dotenv==1.0.1
 redis==5.2.1

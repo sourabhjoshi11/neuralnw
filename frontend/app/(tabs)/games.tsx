@@ -3,8 +3,9 @@ import { View, Text, Pressable, ScrollView, SafeAreaView } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withDelay } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+
 import { Colors, BorderRadius, SpringConfig } from '@/constants/theme';
+import { Haptics, shareText, copyToClipboard } from '@/utils/compat';
 
 type ActionCardProps = {
   emoji: string;
@@ -34,7 +35,7 @@ function ActionCard({ emoji, title, subtitle, cta, gradient, onPress, delay }: A
   return (
     <Pressable
       onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Haptics.light();
         onPress();
       }}
       onPressIn={() => { scale.value = withSpring(0.97, SpringConfig.snappy); }}
@@ -60,19 +61,19 @@ function ActionCard({ emoji, title, subtitle, cta, gradient, onPress, delay }: A
             style={{ padding: 20, gap: 12 }}
           >
             <Text style={{ fontSize: 36 }}>{emoji}</Text>
-            <Text style={{ color: '#fff', fontSize: 20, fontFamily: 'Syne_800ExtraBold' }}>{title}</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontFamily: 'Inter_400Regular' }}>{subtitle}</Text>
+            <Text style={{ color: '#fff', fontSize: 20, fontFamily: 'Poppins_700Bold' }}>{title}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontFamily: 'Poppins_400Regular' }}>{subtitle}</Text>
             <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7, marginTop: 4 }}>
-              <Text style={{ color: '#fff', fontSize: 13, fontFamily: 'Syne_800ExtraBold' }}>{cta}</Text>
+              <Text style={{ color: '#fff', fontSize: 13, fontFamily: 'Poppins_700Bold' }}>{cta}</Text>
             </View>
           </LinearGradient>
         ) : (
           <View style={{ padding: 20, gap: 12 }}>
             <Text style={{ fontSize: 36 }}>{emoji}</Text>
-            <Text style={{ color: Colors.text.primary, fontSize: 20, fontFamily: 'Syne_800ExtraBold' }}>{title}</Text>
-            <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_400Regular' }}>{subtitle}</Text>
+            <Text style={{ color: Colors.text.primary, fontSize: 20, fontFamily: 'Poppins_700Bold' }}>{title}</Text>
+            <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Poppins_400Regular' }}>{subtitle}</Text>
             <View style={{ alignSelf: 'flex-start', backgroundColor: Colors.bg.secondary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', marginTop: 4 }}>
-              <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>{cta}</Text>
+              <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Poppins_600SemiBold' }}>{cta}</Text>
             </View>
           </View>
         )}
@@ -90,10 +91,10 @@ export default function GamesScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg.primary }}>
       <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} showsVerticalScrollIndicator={false}>
         <Animated.View style={titleStyle}>
-          <Text style={{ color: Colors.text.primary, fontSize: 28, fontFamily: 'Syne_800ExtraBold', letterSpacing: -0.5 }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 28, fontFamily: 'Poppins_700Bold', letterSpacing: -0.5 }}>
             Game Rooms
           </Text>
-          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 4 }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular', marginTop: 4 }}>
             Create or join a Spin the Bottle room
           </Text>
         </Animated.View>
@@ -117,7 +118,7 @@ export default function GamesScreen() {
         />
 
         <View style={{ marginTop: 8, padding: 16, backgroundColor: Colors.bg.card, borderRadius: BorderRadius.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', gap: 10 }}>
-          <Text style={{ color: Colors.text.primary, fontSize: 14, fontFamily: 'Syne_800ExtraBold' }}>How to play</Text>
+          <Text style={{ color: Colors.text.primary, fontSize: 14, fontFamily: 'Poppins_700Bold' }}>How to play</Text>
           {[
             ['🍾', 'Spin selects a random anonymous player'],
             ['🎯', 'Truth (+10pts) or Dare (+20pts)'],
@@ -127,7 +128,7 @@ export default function GamesScreen() {
           ].map(([emoji, text]) => (
             <View key={text as string} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
               <Text style={{ fontSize: 16, marginTop: 1 }}>{emoji}</Text>
-              <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 }}>{text}</Text>
+              <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Poppins_400Regular', flex: 1 }}>{text}</Text>
             </View>
           ))}
         </View>

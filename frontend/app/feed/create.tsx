@@ -14,7 +14,7 @@ export default function CreateFeedScreen() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const { token } = useAuthStore();
-  const { setFeed, setMyMemberId } = useFeedStore();
+  const { setFeed, setMyMemberId, addMyFeed } = useFeedStore();
   const scale = useSharedValue(1);
   const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -36,6 +36,7 @@ export default function CreateFeedScreen() {
       }
       setFeed(data.feed);
       setMyMemberId(data.member.id);
+      addMyFeed(data.feed);
       router.push(`/feed/${data.feed.code}`);
     } catch {
       Alert.alert('Error', 'Network error. Please try again.');
@@ -48,16 +49,16 @@ export default function CreateFeedScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg.primary }}>
       <View style={{ flex: 1, padding: 20, gap: 28, justifyContent: 'center' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Pressable onPress={() => router.back()}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/feed')}>
             <Ionicons name="arrow-back" size={24} color={Colors.text.secondary} />
           </Pressable>
-          <Text style={{ color: Colors.text.primary, fontSize: 24, fontFamily: 'Syne_800ExtraBold' }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 24, fontFamily: 'Poppins_700Bold' }}>
             Create Class Feed
           </Text>
         </View>
 
         <View style={{ gap: 12 }}>
-          <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Inter_400Regular' }}>
+          <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Poppins_400Regular' }}>
             Give your feed a name (e.g. "CS-A Batch 2024")
           </Text>
           <TextInput
@@ -68,7 +69,7 @@ export default function CreateFeedScreen() {
               borderColor: name ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.07)',
               color: Colors.text.primary,
               fontSize: 16,
-              fontFamily: 'Inter_500Medium',
+              fontFamily: 'Poppins_500Medium',
               paddingHorizontal: 16,
               paddingVertical: 14,
             }}
@@ -104,7 +105,7 @@ export default function CreateFeedScreen() {
                 elevation: isValid ? 8 : 0,
               }}
             >
-              <Text style={{ color: isValid ? '#fff' : Colors.text.muted, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>
+              <Text style={{ color: isValid ? '#fff' : Colors.text.muted, fontSize: 16, fontFamily: 'Poppins_700Bold' }}>
                 {loading ? 'Creating...' : 'Create Feed 💬'}
               </Text>
             </LinearGradient>

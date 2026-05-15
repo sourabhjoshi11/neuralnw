@@ -49,10 +49,10 @@ export const BorderRadius = {
 } as const;
 
 export const Typography = {
-  display: { fontFamily: 'Syne_900Black' },
-  heading: { fontFamily: 'Syne_800ExtraBold' },
-  body: { fontFamily: 'Inter_400Regular' },
-  bodyMedium: { fontFamily: 'Inter_500Medium' },
-  bodySemiBold: { fontFamily: 'Inter_600SemiBold' },
-  bodyBold: { fontFamily: 'Inter_700Bold' },
+  display: { fontFamily: 'Poppins_700Bold' },
+  heading: { fontFamily: 'Poppins_700Bold' },
+  body: { fontFamily: 'Poppins_400Regular' },
+  bodyMedium: { fontFamily: 'Poppins_500Medium' },
+  bodySemiBold: { fontFamily: 'Poppins_600SemiBold' },
+  bodyBold: { fontFamily: 'Poppins_700Bold' },
 } as const;

@@ -10,6 +10,7 @@ Architecture: HTTP action endpoints call into this engine.
 WebSocket is push-only (server → client).
 """
 import logging
+import math
 import random
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -24,6 +25,22 @@ from app.services.room_manager import room_manager
 from app.services.username import generate_username, pick_color
 
 logger = logging.getLogger(__name__)
+
+# In-memory ready-vote tracker: "room_code:round_id" → set of player_ids
+_ready_votes: dict[str, set[str]] = {}
+
+# Custom vote: "room_code:round_id" → {"yes": set[player_id], "no": set[player_id]}
+_custom_vote: dict[str, dict] = {}
+
+# Suggestion phase: "room_code:round_id" → player_id randomly selected to suggest
+_suggestion_player: dict[str, str] = {}
+
+# Suggestion content: "room_code:round_id" → submitted text (None = not yet submitted)
+# "content:round_id" → text kept for reconnect after content_shown
+_suggestion_content: dict[str, str | None] = {}
+
+# Punishment votes: room_code → {player_id: 'a'|'b'}
+_punishment_votes: dict[str, dict[str, str]] = {}
 
 WHEEL_COLORS = ["#3b82f6", "#06b6d4", "#8b5cf6", "#ec4899", "#10b981", "#f59e0b"]
 
@@ -161,10 +178,25 @@ async def _on_reaction_end(room_code: str) -> None:
 
 
 async def _finish_round(room: Room, db: AsyncSession) -> None:
-    """Mark current round done, shuffle colors, schedule next spin."""
+    """Mark current round done, shuffle colors, schedule next spin (or end game)."""
     round_ = await _get_current_round(room.id, db)
     if round_:
         round_.phase = "done"
+        # Clean up all in-memory state for this round
+        key = f"{room.code}:{round_.id}"
+        _custom_vote.pop(key, None)
+        _suggestion_player.pop(key, None)
+        _suggestion_content.pop(key, None)
+        _suggestion_content.pop(f"content:{round_.id}", None)
+        _ready_votes.pop(key, None)
+
+    # Clean up punishment votes for this room
+    _punishment_votes.pop(room.code, None)
+
+    # Check if overall game timer has expired — end instead of spinning again
+    if room.ends_at and _now() >= room.ends_at:
+        await end_game(room.code, db)
+        return
 
     players = await _get_active_players(room.id, db)
     color_map = _shuffle_colors(players)
@@ -177,6 +209,304 @@ async def _finish_round(room: Room, db: AsyncSession) -> None:
     })
     # Small pause before next spin
     phase_timer.schedule(room.code, 2.0, lambda: _auto_spin(room.code))
+
+
+async def submit_ready(room_code: str, round_id: str, player_id: str, db: AsyncSession) -> None:
+    """Player marks themselves ready to move to next turn (skips reaction timer)."""
+    key = f"{room_code}:{round_id}"
+    if key not in _ready_votes:
+        _ready_votes[key] = set()
+    _ready_votes[key].add(player_id)
+
+    players = await _get_active_players(
+        (await db.execute(select(Room.id).where(Room.code == room_code))).scalar_one(), db
+    )
+    total = max(len(players), 1)
+    ready_count = len(_ready_votes[key])
+    threshold = math.ceil(total / 2)  # simple majority
+
+    await room_manager.broadcast(room_code, {
+        "type": "ready_update",
+        "data": {
+            "round_id": round_id,
+            "ready_count": ready_count,
+            "total": total,
+            "threshold": threshold,
+        },
+    })
+
+    if ready_count >= threshold:
+        _ready_votes.pop(key, None)
+        room = await _get_room(room_code, db)
+        if room.current_phase == "reaction" and room.status == "active":
+            phase_timer.cancel(room_code)
+            await _finish_round(room, db)
+
+
+async def submit_custom_vote(
+    room_code: str,
+    round_id: str,
+    player_id: str,
+    value: str,
+    db: AsyncSession,
+) -> None:
+    """Non-turn player votes yes/no for a custom question this round."""
+    key = f"{room_code}:{round_id}"
+    if key not in _custom_vote:
+        _custom_vote[key] = {"yes": set(), "no": set()}
+
+    # Idempotent — remove previous vote first
+    _custom_vote[key]["yes"].discard(player_id)
+    _custom_vote[key]["no"].discard(player_id)
+    _custom_vote[key]["yes" if value == "yes" else "no"].add(player_id)
+
+    r = await db.execute(select(GameRound).where(GameRound.id == round_id))
+    round_ = r.scalar_one_or_none()
+    if not round_ or round_.phase != "custom_vote":
+        return
+
+    room_id_row = await db.execute(select(Room.id).where(Room.code == room_code))
+    room_id = room_id_row.scalar_one()
+    all_players = await _get_active_players(room_id, db)
+    eligible = [p for p in all_players if p.id != round_.player_id]
+    total = max(len(eligible), 1)
+    yes_count = len(_custom_vote[key]["yes"])
+    no_count = len(_custom_vote[key]["no"])
+    threshold = math.ceil(total / 2)
+
+    await room_manager.broadcast(room_code, {
+        "type": "custom_vote_update",
+        "data": {
+            "round_id": round_id,
+            "yes": yes_count,
+            "no": no_count,
+            "total": total,
+            "threshold": threshold,
+        },
+    })
+
+    # Majority YES reached → start suggestion phase immediately
+    if yes_count >= threshold:
+        _custom_vote.pop(key, None)
+        phase_timer.cancel(room_code)
+        await _start_suggestion_phase(room_code, round_id, round_.choice, eligible, db)
+    # Majority NO is unbeatable (remaining votes can't flip it) → go to DB content
+    elif no_count > total - threshold:
+        _custom_vote.pop(key, None)
+        phase_timer.cancel(room_code)
+        await _use_db_content(room_code, round_id, round_.choice, db)
+
+
+async def _on_custom_vote_end(room_code: str, round_id: str) -> None:
+    from app.db.base import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        try:
+            key = f"{room_code}:{round_id}"
+            votes = _custom_vote.pop(key, {"yes": set(), "no": set()})
+
+            r = await db.execute(select(GameRound).where(GameRound.id == round_id))
+            round_ = r.scalar_one_or_none()
+            if not round_ or round_.phase != "custom_vote":
+                return
+
+            room_id_row = await db.execute(select(Room.id).where(Room.code == room_code))
+            room_id = room_id_row.scalar_one()
+            all_players = await _get_active_players(room_id, db)
+            eligible = [p for p in all_players if p.id != round_.player_id]
+            total = max(len(eligible), 1)
+            yes_count = len(votes["yes"])
+            threshold = math.ceil(total / 2)
+
+            if yes_count >= threshold:
+                await _start_suggestion_phase(room_code, round_id, round_.choice, eligible, db)
+            else:
+                await _use_db_content(room_code, round_id, round_.choice, db)
+        except Exception:
+            logger.exception("Error in custom vote end for room %s", room_code)
+
+
+async def _start_suggestion_phase(
+    room_code: str,
+    round_id: str,
+    choice: str,
+    eligible_players: list[AnonPlayer],
+    db: AsyncSession,
+) -> None:
+    """Pick one random player to submit a custom question."""
+    if not eligible_players:
+        await _use_db_content(room_code, round_id, choice, db)
+        return
+
+    suggester = random.choice(eligible_players)
+    key = f"{room_code}:{round_id}"
+    _suggestion_player[key] = suggester.id
+    _suggestion_content[key] = None  # not yet submitted
+
+    r = await db.execute(select(GameRound).where(GameRound.id == round_id))
+    round_ = r.scalar_one_or_none()
+    if not round_:
+        return
+
+    room = await _get_room(room_code, db)
+    dur = PHASE_DURATIONS["suggestion"]
+    ends_at = _now() + timedelta(seconds=dur)
+    round_.phase = "suggestion"
+    round_.phase_ends_at = ends_at
+    room.current_phase = "suggestion"
+    await db.commit()
+
+    await room_manager.broadcast(room_code, {
+        "type": "phase_change",
+        "data": {
+            "phase": "suggestion",
+            "choice": choice,
+            "suggester_player_id": suggester.id,
+            "round_id": round_id,
+            "ends_at": ends_at.isoformat(),
+        },
+    })
+    phase_timer.schedule(room_code, dur, lambda: _on_suggestion_end(room_code, round_id, choice))
+
+
+async def submit_suggestion(
+    room_code: str,
+    round_id: str,
+    player_id: str,
+    content: str,
+    db: AsyncSession,
+) -> None:
+    """The randomly-selected player submits their custom question.
+    Timer is cancelled immediately — no need to wait once content is in."""
+    key = f"{room_code}:{round_id}"
+    if _suggestion_player.get(key) != player_id:
+        raise ValueError("You are not selected to suggest this round")
+    if not content or len(content.strip()) == 0:
+        raise ValueError("Question cannot be empty")
+    if len(content) > 300:
+        raise ValueError("Question too long (max 300 chars)")
+
+    stored = content.strip()
+    _suggestion_content[key] = stored
+    _suggestion_player.pop(key, None)
+
+    # Broadcast first so clients show "submitted" state briefly
+    await room_manager.broadcast(room_code, {
+        "type": "suggestion_submitted",
+        "data": {"round_id": round_id},
+    })
+
+    # Cancel the suggestion timer and proceed immediately
+    r = await db.execute(select(GameRound).where(GameRound.id == round_id))
+    round_ = r.scalar_one_or_none()
+    if not round_ or round_.phase != "suggestion":
+        return
+
+    phase_timer.cancel(room_code)
+    _suggestion_content.pop(key, None)
+    await _apply_content(room_code, round_id, round_.choice, stored, None, db)
+
+
+async def _on_suggestion_end(room_code: str, round_id: str, choice: str) -> None:
+    from app.db.base import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        try:
+            key = f"{room_code}:{round_id}"
+            content = _suggestion_content.pop(key, None)
+            _suggestion_player.pop(key, None)
+
+            r = await db.execute(select(GameRound).where(GameRound.id == round_id))
+            round_ = r.scalar_one_or_none()
+            if not round_ or round_.phase != "suggestion":
+                return
+
+            if content:
+                await _apply_content(room_code, round_id, choice, content, None, db)
+            else:
+                await _use_db_content(room_code, round_id, choice, db)
+        except Exception:
+            logger.exception("Error in suggestion end for room %s", room_code)
+
+
+async def _use_db_content(room_code: str, round_id: str, choice: str, db: AsyncSession) -> None:
+    content = await _random_content(choice, db)
+    if not content:
+        room = await _get_room(room_code, db)
+        await _finish_round(room, db)
+        return
+    await _apply_content(room_code, round_id, choice, None, content, db)
+
+
+async def _apply_content(
+    room_code: str,
+    round_id: str,
+    choice: str,
+    custom_text: str | None,
+    db_content: TruthOrDare | None,
+    db: AsyncSession,
+) -> None:
+    """Set content on round and advance to truth_question or dare_show."""
+    r = await db.execute(select(GameRound).where(GameRound.id == round_id))
+    round_ = r.scalar_one_or_none()
+    if not round_:
+        return
+
+    if custom_text:
+        pts = 10 if choice == "truth" else 20
+        content_data: dict[str, Any] = {"id": None, "type": choice, "content": custom_text, "pts": pts}
+        round_.content_id = None
+        # Store for reconnect
+        _suggestion_content[f"content:{round_id}"] = custom_text
+    else:
+        assert db_content is not None
+        content_data = _content_dict(db_content)
+        round_.content_id = db_content.id
+
+    room = await _get_room(room_code, db)
+
+    if choice == "truth":
+        show_dur = PHASE_DURATIONS["truth_question"]
+        answer_dur = PHASE_DURATIONS["truth_answer"]
+        ends_at = _now() + timedelta(seconds=show_dur)
+        round_.phase = "truth_question"
+        round_.phase_ends_at = ends_at
+        room.current_phase = "truth_question"
+        await db.commit()
+
+        await room_manager.broadcast(room_code, {
+            "type": "content_shown",
+            "data": {
+                "round_id": round_id,
+                "phase": "truth_question",
+                "content": content_data,
+                "phase_ends_at": ends_at.isoformat(),
+            },
+        })
+        phase_timer.schedule(
+            room_code, show_dur,
+            lambda: _on_truth_question_shown(room_code, round_id, answer_dur),
+        )
+    else:
+        show_dur = PHASE_DURATIONS["dare_show"]
+        vote_dur = PHASE_DURATIONS["dare_vote"]
+        ends_at = _now() + timedelta(seconds=show_dur)
+        round_.phase = "dare_show"
+        round_.phase_ends_at = ends_at
+        room.current_phase = "dare_show"
+        await db.commit()
+
+        await room_manager.broadcast(room_code, {
+            "type": "content_shown",
+            "data": {
+                "round_id": round_id,
+                "phase": "dare_show",
+                "content": content_data,
+                "phase_ends_at": ends_at.isoformat(),
+            },
+        })
+        phase_timer.schedule(
+            room_code, show_dur,
+            lambda: _on_dare_shown(room_code, round_id, vote_dur),
+        )
 
 
 async def _auto_spin(room_code: str) -> None:
@@ -215,6 +545,12 @@ async def get_room_state(room_code: str, db: AsyncSession) -> dict[str, Any]:
         tod = r.scalar_one_or_none()
         if tod:
             content = _content_dict(tod)
+    elif round_:
+        custom_text = _suggestion_content.get(f"content:{round_.id}")
+        if custom_text:
+            choice = round_.choice or "truth"
+            content = {"id": None, "type": choice, "content": custom_text,
+                       "pts": 10 if choice == "truth" else 20}
 
     if round_:
         v_r = await db.execute(select(Vote).where(Vote.round_id == round_.id))
@@ -235,6 +571,7 @@ async def get_room_state(room_code: str, db: AsyncSession) -> dict[str, Any]:
             "code": room.code,
             "status": room.status,
             "phase": room.current_phase,
+            "host_id": room.host_id,
             "duration_minutes": room.duration_minutes,
             "starts_at": room.starts_at.isoformat() if room.starts_at else None,
             "ends_at": room.ends_at.isoformat() if room.ends_at else None,
@@ -252,6 +589,7 @@ async def get_room_state(room_code: str, db: AsyncSession) -> dict[str, Any]:
             "votes": votes,
             "reactions": reactions,
             "comments": comments,
+            "suggester_player_id": _suggestion_player.get(f"{room_code}:{round_.id}"),
         } if round_ else None,
         "server_time": _now().isoformat(),
     }
@@ -270,10 +608,9 @@ async def start_game(room_code: str, db: AsyncSession) -> None:
     room.status = "active"
     room.starts_at = now
     room.ends_at = now + timedelta(minutes=room.duration_minutes)
-    room.current_phase = "spinning"
+    room.current_phase = "waiting_spin"  # host must press spin to start
 
     color_map = _shuffle_colors(players)
-    # Assign fresh usernames too
     for p in players:
         p.username = generate_username()
 
@@ -288,8 +625,7 @@ async def start_game(room_code: str, db: AsyncSession) -> None:
             "players": [_player_dict(p) for p in players],
         },
     })
-
-    phase_timer.schedule(room.code, 1.0, lambda: _auto_spin(room.code))
+    # No auto-spin — host presses the spin button manually for the first spin
 
 
 async def trigger_spin(room_code: str, db: AsyncSession) -> None:
@@ -411,59 +747,28 @@ async def submit_choice(room_code: str, round_id: str, choice: str, db: AsyncSes
 
     phase_timer.cancel(room_code)
 
-    content = await _random_content(choice, db)
-    if not content:
-        raise ValueError("No content available")
-
     round_.choice = choice
-    round_.content_id = content.id
 
-    if choice == "truth":
-        show_dur = PHASE_DURATIONS["truth_question"]
-        answer_dur = PHASE_DURATIONS["truth_answer"]
-        ends_at = _now() + timedelta(seconds=show_dur)
-        round_.phase = "truth_question"
-        round_.phase_ends_at = ends_at
-        await db.commit()
+    # After choice → go to custom_vote phase (others vote: custom question or random?)
+    dur = PHASE_DURATIONS["custom_vote"]
+    ends_at = _now() + timedelta(seconds=dur)
+    round_.phase = "custom_vote"
+    round_.phase_ends_at = ends_at
 
-        await room_manager.broadcast(room_code, {
-            "type": "content_shown",
-            "data": {
-                "round_id": round_id,
-                "phase": "truth_question",
-                "content": _content_dict(content),
-                "phase_ends_at": ends_at.isoformat(),
-            },
-        })
+    room = await _get_room(room_code, db)
+    room.current_phase = "custom_vote"
+    await db.commit()
 
-        phase_timer.schedule(
-            room_code,
-            show_dur,
-            lambda: _on_truth_question_shown(room_code, round_id, answer_dur),
-        )
-    else:  # dare
-        show_dur = PHASE_DURATIONS["dare_show"]
-        vote_dur = PHASE_DURATIONS["dare_vote"]
-        ends_at = _now() + timedelta(seconds=show_dur)
-        round_.phase = "dare_show"
-        round_.phase_ends_at = ends_at
-        await db.commit()
-
-        await room_manager.broadcast(room_code, {
-            "type": "content_shown",
-            "data": {
-                "round_id": round_id,
-                "phase": "dare_show",
-                "content": _content_dict(content),
-                "phase_ends_at": ends_at.isoformat(),
-            },
-        })
-
-        phase_timer.schedule(
-            room_code,
-            show_dur,
-            lambda: _on_dare_shown(room_code, round_id, vote_dur),
-        )
+    await room_manager.broadcast(room_code, {
+        "type": "phase_change",
+        "data": {
+            "phase": "custom_vote",
+            "choice": choice,
+            "round_id": round_id,
+            "ends_at": ends_at.isoformat(),
+        },
+    })
+    phase_timer.schedule(room_code, dur, lambda: _on_custom_vote_end(room_code, round_id))
 
 
 async def _on_truth_question_shown(room_code: str, round_id: str, answer_dur: float) -> None:
@@ -582,7 +887,7 @@ async def cast_vote(
     await db.commit()
 
     all_votes_r = await db.execute(select(Vote).where(Vote.round_id == round_id))
-    all_votes = all_votes_r.scalars().all()
+    all_votes = list(all_votes_r.scalars().all())
 
     await room_manager.broadcast(room_code, {
         "type": "vote_update",
@@ -593,50 +898,80 @@ async def cast_vote(
         },
     })
 
+    # Auto-proceed dare vote when majority is reached
+    r_round = await db.execute(select(GameRound).where(GameRound.id == round_id))
+    round_ = r_round.scalar_one_or_none()
+    if round_ and round_.phase == "dare_vote":
+        all_players = await _get_active_players(round_.room_id, db)
+        eligible_count = max(len([p for p in all_players if p.id != round_.player_id]), 1)
+        yes_count = sum(1 for v in all_votes if v.value == "yes")
+        no_count = sum(1 for v in all_votes if v.value == "no")
+        threshold = math.ceil(eligible_count / 2)
+        if yes_count >= threshold or no_count >= threshold:
+            phase_timer.cancel(room_code)
+            await _process_dare_vote_end(room_code, round_id, round_, list(all_votes), db)
+
 
 async def _on_dare_vote_end(room_code: str, round_id: str) -> None:
+    """Timer callback — runs in its own session."""
     from app.db.base import AsyncSessionLocal
     async with AsyncSessionLocal() as db:
-        r = await db.execute(select(GameRound).where(GameRound.id == round_id))
-        round_ = r.scalar_one_or_none()
-        if not round_ or round_.phase != "dare_vote":
-            return
+        try:
+            r = await db.execute(select(GameRound).where(GameRound.id == round_id))
+            round_ = r.scalar_one_or_none()
+            if not round_ or round_.phase != "dare_vote":
+                return
+            votes_r = await db.execute(select(Vote).where(Vote.round_id == round_id))
+            votes = list(votes_r.scalars().all())
+            await _process_dare_vote_end(room_code, round_id, round_, votes, db)
+        except Exception:
+            logger.exception("Error in dare vote end for room %s", room_code)
 
-        votes_r = await db.execute(select(Vote).where(Vote.round_id == round_id))
-        votes = votes_r.scalars().all()
-        yes = sum(1 for v in votes if v.value == "yes")
-        total = len(votes)
-        passed = total > 0 and yes > total / 2
 
-        round_.dare_passed = passed
+async def _process_dare_vote_end(
+    room_code: str,
+    round_id: str,
+    round_: GameRound,
+    votes: list[Vote],
+    db: AsyncSession,
+) -> None:
+    """Shared logic for dare vote resolution (called by timer or auto-proceed)."""
+    if round_.phase != "dare_vote":
+        return
 
-        player_r = await db.execute(select(AnonPlayer).where(AnonPlayer.id == round_.player_id))
-        player = player_r.scalar_one_or_none()
-        if player:
-            if passed:
-                player.points += 20
-            player.turn_count += 1
-            player.last_turn_at = _now()
+    yes = sum(1 for v in votes if v.value == "yes")
+    total = len(votes)
+    passed = total > 0 and yes > total / 2
 
-        room = await _get_room(room_code, db)
-        await db.commit()
+    round_.dare_passed = passed
 
+    player_r = await db.execute(select(AnonPlayer).where(AnonPlayer.id == round_.player_id))
+    player = player_r.scalar_one_or_none()
+    if player:
+        if passed:
+            player.points += 20
+        player.turn_count += 1
+        player.last_turn_at = _now()
+
+    room = await _get_room(room_code, db)
+    await db.commit()
+
+    await room_manager.broadcast(room_code, {
+        "type": "dare_result",
+        "data": {
+            "round_id": round_id,
+            "passed": passed,
+            "yes_votes": yes,
+            "total_votes": total,
+        },
+    })
+    if player:
         await room_manager.broadcast(room_code, {
-            "type": "dare_result",
-            "data": {
-                "round_id": round_id,
-                "passed": passed,
-                "yes_votes": yes,
-                "total_votes": total,
-            },
+            "type": "points_update",
+            "data": {"player_id": player.id, "pts": player.points, "delta": 20 if passed else 0},
         })
-        if player:
-            await room_manager.broadcast(room_code, {
-                "type": "points_update",
-                "data": {"player_id": player.id, "pts": player.points, "delta": 20 if passed else 0},
-            })
 
-        await _advance_to_reaction(room, round_, db)
+    await _advance_to_reaction(room, round_, db)
 
 
 async def add_reaction(
@@ -658,6 +993,7 @@ async def add_reaction(
     rc = Reaction(round_id=round_id, player_id=player_id, emoji=emoji)
     db.add(rc)
     await db.commit()
+    await db.refresh(rc)  # populate rc.id
 
     if is_first:
         player_r = await db.execute(select(AnonPlayer).where(AnonPlayer.id == player_id))
@@ -672,7 +1008,7 @@ async def add_reaction(
 
     await room_manager.broadcast(room_code, {
         "type": "reaction",
-        "data": {"round_id": round_id, "player_id": player_id, "emoji": emoji},
+        "data": {"id": rc.id, "round_id": round_id, "player_id": player_id, "emoji": emoji},
     })
 
 
@@ -707,6 +1043,42 @@ async def add_comment(
             "created_at": comment.created_at.isoformat(),
         },
     })
+
+
+async def dare_complete(
+    room_code: str,
+    round_id: str,
+    player_id: str,
+    db: AsyncSession,
+) -> None:
+    """Dare player manually signals they are done — advance to dare_vote immediately."""
+    r = await db.execute(select(GameRound).where(GameRound.id == round_id))
+    round_ = r.scalar_one_or_none()
+    if not round_ or round_.phase != "dare_show":
+        raise ValueError("Not in dare_show phase")
+    if round_.player_id != player_id:
+        raise ValueError("Only the dare player can mark dare as complete")
+
+    phase_timer.cancel(room_code)
+
+    vote_dur = PHASE_DURATIONS["dare_vote"]
+    ends_at = _now() + timedelta(seconds=vote_dur)
+    round_.phase = "dare_vote"
+    round_.phase_ends_at = ends_at
+
+    room = await _get_room(room_code, db)
+    room.current_phase = "dare_vote"
+    await db.commit()
+
+    await room_manager.broadcast(room_code, {
+        "type": "phase_change",
+        "data": {"phase": "dare_vote", "round_id": round_id, "ends_at": ends_at.isoformat()},
+    })
+    phase_timer.schedule(
+        room_code,
+        vote_dur,
+        lambda: _on_dare_vote_end(room_code, round_id),
+    )
 
 
 async def handle_skip(
@@ -746,6 +1118,8 @@ async def handle_skip(
     player.skips_used += 1
     skip_n = player.skips_used
     player.points = max(0, player.points - 5)
+    player.turn_count += 1
+    player.last_turn_at = _now()
 
     if skip_n >= 3:
         # Third skip — punishment vote
@@ -800,25 +1174,108 @@ async def _start_punishment_vote(room_code: str, target_id: str, db: AsyncSessio
     )
 
 
+async def submit_punishment_vote(
+    room_code: str,
+    voter_id: str,
+    value: str,
+    db: AsyncSession,
+) -> None:
+    """Record a punishment vote ('a' = ban, 'b' = reveal) and broadcast live tally."""
+    if room_code not in _punishment_votes:
+        _punishment_votes[room_code] = {}
+    _punishment_votes[room_code][voter_id] = value
+
+    votes = _punishment_votes[room_code]
+    a_count = sum(1 for v in votes.values() if v == "a")
+    b_count = sum(1 for v in votes.values() if v == "b")
+
+    room_id_row = await db.execute(select(Room.id).where(Room.code == room_code))
+    room_id = room_id_row.scalar_one()
+    all_players = await _get_active_players(room_id, db)
+    total_voters = len(all_players)
+
+    await room_manager.broadcast(room_code, {
+        "type": "vote_update",
+        "data": {
+            "votes": [{"player_id": pid, "value": v} for pid, v in votes.items()],
+            "total": len(votes),
+            "total_voters": total_voters,
+        },
+    })
+
+
 async def _on_punishment_vote_end(room_code: str, target_id: str) -> None:
     from app.db.base import AsyncSessionLocal
     async with AsyncSessionLocal() as db:
-        room = await _get_room(room_code, db)
-        # Tally the most recent punishment votes from round-less votes
-        # For simplicity, broadcast result without storing separately
-        # Majority A = ban, majority B = reveal, tie = ban
-        await room_manager.broadcast(room_code, {
-            "type": "punishment_vote_result",
-            "data": {"result": "ban", "target_player_id": target_id},
-        })
+        try:
+            room = await _get_room(room_code, db)
 
-        player_r = await db.execute(select(AnonPlayer).where(AnonPlayer.id == target_id))
-        player = player_r.scalar_one_or_none()
-        if player:
-            player.is_banned = True
-        room.current_phase = "spinning"
-        await db.commit()
-        await _finish_round(room, db)
+            # Tally votes — majority A = ban, majority B = reveal, tie = ban
+            votes = _punishment_votes.pop(room_code, {})
+            a_count = sum(1 for v in votes.values() if v == "a")
+            b_count = sum(1 for v in votes.values() if v == "b")
+            result = "reveal" if b_count > a_count else "ban"
+
+            await room_manager.broadcast(room_code, {
+                "type": "punishment_vote_result",
+                "data": {"result": result, "target_player_id": target_id},
+            })
+
+            player_r = await db.execute(select(AnonPlayer).where(AnonPlayer.id == target_id))
+            player = player_r.scalar_one_or_none()
+
+            if result == "ban" and player:
+                player.is_banned = True
+            elif result == "reveal" and player:
+                # Identity will be revealed at game end — mark with a flag (use skips_used as proxy)
+                # Actual reveal happens in end_game; here we just broadcast identity now
+                from app.models.user import User
+                from app.core.security import decrypt_field
+                user_r = await db.execute(select(User).where(User.id == player.user_id))
+                user = user_r.scalar_one_or_none()
+                if user:
+                    try:
+                        real_name = decrypt_field(user.name_encrypted)
+                        phone = decrypt_field(user.phone_encrypted)
+                        # Schedule identity_reveal phase briefly
+                        reveal_dur = PHASE_DURATIONS["identity_reveal"]
+                        ends_at = _now() + timedelta(seconds=reveal_dur)
+                        room.current_phase = "identity_reveal"
+                        await db.commit()
+
+                        await room_manager.broadcast(room_code, {
+                            "type": "identity_reveal",
+                            "data": {
+                                "playerId": player.id,
+                                "realName": real_name,
+                                "phoneLast4": phone[-4:],
+                                "ends_at": ends_at.isoformat(),
+                            },
+                        })
+                        phase_timer.schedule(
+                            room_code, reveal_dur,
+                            lambda: _after_identity_reveal(room_code)
+                        )
+                        return
+                    except Exception:
+                        logger.exception("Identity reveal failed for room %s", room_code)
+
+            room.current_phase = "spinning"
+            await db.commit()
+            await _finish_round(room, db)
+        except Exception:
+            logger.exception("Error in punishment vote end for room %s", room_code)
+
+
+async def _after_identity_reveal(room_code: str) -> None:
+    """Called after identity_reveal display — proceed to next round."""
+    from app.db.base import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        try:
+            room = await _get_room(room_code, db)
+            await _finish_round(room, db)
+        except Exception:
+            logger.exception("Error after identity reveal for room %s", room_code)
 
 
 async def end_game(room_code: str, db: AsyncSession) -> None:

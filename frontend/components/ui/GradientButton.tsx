@@ -1,7 +1,7 @@
 import { Pressable, Text } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import { Haptics } from '@/utils/compat';
 import { BorderRadius, SpringConfig } from '@/constants/theme';
 
 type Props = {
@@ -42,7 +42,7 @@ export function GradientButton({
   };
   const handlePress = () => {
     if (!active) return;
-    if (haptic) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (haptic) Haptics.light();
     onPress();
   };
 
@@ -75,7 +75,7 @@ export function GradientButton({
             style={{
               color: active ? '#fff' : '#475569',
               fontSize: sz.fontSize,
-              fontFamily: 'Syne_800ExtraBold',
+              fontFamily: 'Poppins_700Bold',
             }}
           >
             {loading ? 'Loading...' : label}

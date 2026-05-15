@@ -8,15 +8,19 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
+  withSequence,
+  Easing,
   FadeIn,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import { Haptics } from '@/utils/compat';
 
 import { Colors, BorderRadius, SpringConfig } from '@/constants/theme';
 import { useGameTimer } from '@/hooks/useGameTimer';
@@ -29,6 +33,20 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
 function TimerPill({ endsAt, warnAt = 15 }: { endsAt: string | null; warnAt?: number }) {
   const { secondsLeft, formatted } = useGameTimer(endsAt);
   const urgent = secondsLeft <= warnAt && secondsLeft > 0;
+  const prevSeconds = useRef(secondsLeft);
+
+  // Haptic beep on each second tick when ≤5s left
+  useEffect(() => {
+    if (
+      secondsLeft > 0 &&
+      secondsLeft <= 5 &&
+      secondsLeft !== prevSeconds.current
+    ) {
+      secondsLeft <= 2 ? Haptics.heavy() : Haptics.medium();
+    }
+    prevSeconds.current = secondsLeft;
+  }, [secondsLeft]);
+
   return (
     <View
       style={{
@@ -55,7 +73,7 @@ function TimerPill({ endsAt, warnAt = 15 }: { endsAt: string | null; warnAt?: nu
         style={{
           color: urgent ? Colors.red : Colors.text.secondary,
           fontSize: 13,
-          fontFamily: 'Inter_700Bold',
+          fontFamily: 'Poppins_700Bold',
         }}
       >
         {formatted}
@@ -88,7 +106,7 @@ function PlayerAvatar({
         style={{
           color: player.color,
           fontSize: size * 0.38,
-          fontFamily: 'Syne_800ExtraBold',
+          fontFamily: 'Poppins_700Bold',
         }}
       >
         {player.username[0]?.toUpperCase() ?? '?'}
@@ -123,7 +141,7 @@ function ContentCard({ content }: { content: TruthOrDare }) {
             paddingVertical: 4,
           }}
         >
-          <Text style={{ color: '#fff', fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 1 }}>
+          <Text style={{ color: '#fff', fontSize: 11, fontFamily: 'Poppins_700Bold', letterSpacing: 1 }}>
             {isTruth ? 'TRUTH' : 'DARE'}
           </Text>
         </View>
@@ -135,7 +153,7 @@ function ContentCard({ content }: { content: TruthOrDare }) {
             paddingVertical: 3,
           }}
         >
-          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_600SemiBold' }}>
             +{content.points}pt
           </Text>
         </View>
@@ -144,7 +162,7 @@ function ContentCard({ content }: { content: TruthOrDare }) {
         style={{
           color: Colors.text.primary,
           fontSize: 20,
-          fontFamily: 'Syne_800ExtraBold',
+          fontFamily: 'Poppins_700Bold',
           lineHeight: 28,
         }}
       >
@@ -177,7 +195,7 @@ export function TruthQuestionView({
       {turnPlayer && (
         <View style={{ alignItems: 'center', gap: 10 }}>
           <PlayerAvatar player={turnPlayer} size={56} />
-          <Text style={{ color: turnPlayer.color, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>
+          <Text style={{ color: turnPlayer.color, fontSize: 16, fontFamily: 'Poppins_700Bold' }}>
             {turnPlayer.username} chose Truth
           </Text>
         </View>
@@ -190,7 +208,7 @@ export function TruthQuestionView({
       )}
 
       <View style={{ alignItems: 'center', gap: 10 }}>
-        <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+        <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular' }}>
           Read the question carefully...
         </Text>
         <TimerPill endsAt={phaseEndsAt} warnAt={2} />
@@ -233,7 +251,7 @@ export function TruthAnswerView({
     const trimmed = answer.trim();
     if (!trimmed || !currentRoundId || !token || submitting) return;
     setSubmitting(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.medium();
     try {
       await fetch(`${API_URL}/game/rounds/${currentRoundId}/answer`, {
         method: 'POST',
@@ -250,7 +268,7 @@ export function TruthAnswerView({
   const skipTurn = async () => {
     if (!token || skipping) return;
     setSkipping(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Haptics.error();
     try {
       const res = await fetch(`${API_URL}/game/rooms/${roomCode}/skip`, {
         method: 'POST',
@@ -280,7 +298,7 @@ export function TruthAnswerView({
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <PlayerAvatar player={turnPlayer} size={40} />
               <Text
-                style={{ color: turnPlayer.color, fontSize: 15, fontFamily: 'Syne_800ExtraBold' }}
+                style={{ color: turnPlayer.color, fontSize: 15, fontFamily: 'Poppins_700Bold' }}
               >
                 {turnPlayer.username} is answering...
               </Text>
@@ -308,11 +326,11 @@ export function TruthAnswerView({
 
         <View style={{ gap: 8 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
+            <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Poppins_600SemiBold' }}>
               Your answer
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Text style={{ color: answer.length > MAX * 0.85 ? Colors.red : Colors.text.muted, fontSize: 11, fontFamily: 'Inter_400Regular' }}>
+              <Text style={{ color: answer.length > MAX * 0.85 ? Colors.red : Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_400Regular' }}>
                 {answer.length}/{MAX}
               </Text>
               <TimerPill endsAt={phaseEndsAt} />
@@ -327,7 +345,7 @@ export function TruthAnswerView({
               borderColor: answer ? 'rgba(59,130,246,0.35)' : 'rgba(255,255,255,0.08)',
               color: Colors.text.primary,
               fontSize: 16,
-              fontFamily: 'Inter_400Regular',
+              fontFamily: 'Poppins_400Regular',
               paddingHorizontal: 16,
               paddingVertical: 14,
               minHeight: 120,
@@ -369,7 +387,7 @@ export function TruthAnswerView({
                 style={{
                   color: answer.trim() ? '#fff' : Colors.text.muted,
                   fontSize: 16,
-                  fontFamily: 'Syne_800ExtraBold',
+                  fontFamily: 'Poppins_700Bold',
                 }}
               >
                 {submitting ? 'Submitting...' : 'Submit Answer ✓'}
@@ -390,12 +408,80 @@ export function TruthAnswerView({
             alignItems: 'center',
           }}
         >
-          <Text style={{ color: Colors.red, fontSize: 14, fontFamily: 'Syne_800ExtraBold' }}>
+          <Text style={{ color: Colors.red, fontSize: 14, fontFamily: 'Poppins_700Bold' }}>
             {skipping ? 'Skipping...' : '💨 Skip (costs a life)'}
           </Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+// ─── FloatingEmoji ────────────────────────────────────────────────────────────
+
+function FloatingEmoji({
+  emoji,
+  startX,
+  onDone,
+}: {
+  emoji: string;
+  startX: number;
+  onDone: () => void;
+}) {
+  const translateY = useSharedValue(0);
+  const translateX = useSharedValue(0);
+  const opacity = useSharedValue(0);
+  const scale = useSharedValue(0.4);
+
+  useEffect(() => {
+    const drift = (Math.random() - 0.5) * 50;
+    const rise = 220 + Math.random() * 80;
+
+    // Pop in
+    scale.value = withSequence(
+      withSpring(1.3, { damping: 7, stiffness: 350 }),
+      withTiming(1.0, { duration: 150 }),
+    );
+    opacity.value = withSequence(
+      withTiming(1, { duration: 120 }),
+      withTiming(1, { duration: 1200 }),
+      withTiming(0, { duration: 600 }),
+    );
+    translateY.value = withTiming(-rise, {
+      duration: 1900,
+      easing: Easing.out(Easing.quad),
+    });
+    translateX.value = withTiming(drift, { duration: 1900 });
+
+    const t = setTimeout(onDone, 1950);
+    return () => clearTimeout(t);
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.Text
+      style={[
+        {
+          position: 'absolute',
+          bottom: 90,
+          left: startX,
+          fontSize: 34,
+          zIndex: 999,
+        },
+        style,
+      ]}
+      pointerEvents="none"
+    >
+      {emoji}
+    </Animated.Text>
   );
 }
 
@@ -415,6 +501,7 @@ export function ReactionView({
   phaseEndsAt,
   token,
   dareResult,
+  readyVotes,
 }: {
   players: AnonPlayer[];
   myPlayer: AnonPlayer | null;
@@ -426,11 +513,33 @@ export function ReactionView({
   phaseEndsAt: string | null;
   token: string | null;
   dareResult?: { passed: boolean; yesVotes: number; totalVotes: number } | null;
+  readyVotes?: { count: number; total: number; threshold: number };
 }) {
   const [commentText, setCommentText] = useState('');
   const [sending, setSending] = useState(false);
-  const [myReaction, setMyReaction] = useState<string | null>(null);
+  const [iAmReady, setIAmReady] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  // Floating emoji state — YouTube-style (local + remote)
+  const [floaters, setFloaters] = useState<{ id: string; emoji: string; x: number }[]>([]);
+  const seenReactionIds = useRef<Set<string>>(new Set());
+  // Per-emoji cooldown timestamps (800ms) to prevent backend spam
+  const emojiCooldowns = useRef<Map<string, number>>(new Map());
+
+  // Spawn floaters for incoming WS reactions (other players)
+  useEffect(() => {
+    const newOnes = reactions.filter((r) => !seenReactionIds.current.has(r.id));
+    newOnes.forEach((r) => seenReactionIds.current.add(r.id));
+    if (newOnes.length === 0) return;
+    setFloaters((prev) => [
+      ...prev,
+      ...newOnes.map((r) => ({
+        id: r.id + '_' + Date.now() + Math.random(),
+        emoji: r.emoji,
+        x: 220 + Math.random() * 100,
+      })),
+    ]);
+  }, [reactions]);
 
   // Aggregate emoji counts
   const emojiCounts = EMOJIS.reduce<Record<string, number>>((acc, e) => {
@@ -438,25 +547,35 @@ export function ReactionView({
     return acc;
   }, {});
 
-  const sendReaction = useCallback(async (emoji: string) => {
-    if (!currentRoundId || !token || myReaction === emoji) return;
-    setMyReaction(emoji);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await fetch(`${API_URL}/game/rounds/${currentRoundId}/react`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ emoji }),
-      });
-    } catch { /* WS will reflect */ }
-  }, [currentRoundId, token, myReaction]);
+  const sendReaction = useCallback((emoji: string) => {
+    if (!currentRoundId || !token) return;
+
+    // Spawn local floater immediately (no wait for WS echo)
+    setFloaters((prev) => [
+      ...prev,
+      { id: `local_${Date.now()}_${Math.random()}`, emoji, x: 220 + Math.random() * 100 },
+    ]);
+    Haptics.light();
+
+    // Cooldown: only send to backend once per 800ms per emoji
+    const now = Date.now();
+    const last = emojiCooldowns.current.get(emoji) ?? 0;
+    if (now - last < 800) return;
+    emojiCooldowns.current.set(emoji, now);
+
+    fetch(`${API_URL}/game/rounds/${currentRoundId}/react`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ emoji }),
+    }).catch(() => { /* silent */ });
+  }, [currentRoundId, token]);
 
   const sendComment = useCallback(async () => {
     const trimmed = commentText.trim();
     if (!trimmed || !currentRoundId || !token || sending) return;
     setSending(true);
     setCommentText('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.medium();
     try {
       await fetch(`${API_URL}/game/rounds/${currentRoundId}/comment`, {
         method: 'POST',
@@ -468,7 +587,21 @@ export function ReactionView({
     }
   }, [commentText, currentRoundId, token, sending]);
 
+  const sendReady = useCallback(async () => {
+    if (!currentRoundId || !token || iAmReady) return;
+    setIAmReady(true);
+    Haptics.success();
+    try {
+      await fetch(`${API_URL}/game/rounds/${currentRoundId}/ready`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch { /* WS will update state */ }
+  }, [currentRoundId, token, iAmReady]);
+
   const isTruth = content?.type === 'truth';
+  const readyCount = readyVotes?.count ?? 0;
+  const readyThreshold = readyVotes?.threshold ?? 1;
 
   return (
     <KeyboardAvoidingView
@@ -477,6 +610,18 @@ export function ReactionView({
       keyboardVerticalOffset={80}
     >
       <View style={{ flex: 1 }}>
+        {/* Floating emoji reactions — YouTube style */}
+        {floaters.map((f) => (
+          <FloatingEmoji
+            key={f.id}
+            emoji={f.emoji}
+            startX={f.x}
+            onDone={() =>
+              setFloaters((prev) => prev.filter((p) => p.id !== f.id))
+            }
+          />
+        ))}
+
         {/* Scrollable content area */}
         <ScrollView
           ref={scrollRef}
@@ -500,10 +645,10 @@ export function ReactionView({
                 gap: 10,
               }}
             >
-              <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_500Medium' }}>
+              <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Poppins_500Medium' }}>
                 {isTruth ? '🎯 Truth' : '🔥 Dare'}
               </Text>
-              <Text style={{ color: Colors.text.primary, fontSize: 16, fontFamily: 'Syne_800ExtraBold', lineHeight: 22 }}>
+              <Text style={{ color: Colors.text.primary, fontSize: 16, fontFamily: 'Poppins_700Bold', lineHeight: 22 }}>
                 {content.content}
               </Text>
               {currentAnswer && (
@@ -516,10 +661,10 @@ export function ReactionView({
                     borderLeftColor: Colors.blue,
                   }}
                 >
-                  <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_500Medium', marginBottom: 4 }}>
+                  <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_500Medium', marginBottom: 4 }}>
                     Answer
                   </Text>
-                  <Text style={{ color: Colors.text.primary, fontSize: 15, fontFamily: 'Inter_400Regular', lineHeight: 22 }}>
+                  <Text style={{ color: Colors.text.primary, fontSize: 15, fontFamily: 'Poppins_400Regular', lineHeight: 22 }}>
                     {currentAnswer}
                   </Text>
                 </View>
@@ -542,10 +687,10 @@ export function ReactionView({
               }}
             >
               <Text style={{ fontSize: 28 }}>{dareResult.passed ? '✅' : '❌'}</Text>
-              <Text style={{ color: dareResult.passed ? Colors.green : Colors.red, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>
+              <Text style={{ color: dareResult.passed ? Colors.green : Colors.red, fontSize: 16, fontFamily: 'Poppins_700Bold' }}>
                 {dareResult.passed ? 'Dare Completed!' : 'Dare Failed'}
               </Text>
-              <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+              <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular' }}>
                 {dareResult.yesVotes}/{dareResult.totalVotes} voted yes
               </Text>
             </Animated.View>
@@ -579,14 +724,14 @@ export function ReactionView({
                       marginTop: 2,
                     }}
                   >
-                    <Text style={{ color: c.color, fontSize: 11, fontFamily: 'Syne_800ExtraBold' }}>
+                    <Text style={{ color: c.color, fontSize: 11, fontFamily: 'Poppins_700Bold' }}>
                       {c.username[0]?.toUpperCase()}
                     </Text>
                   </View>
                 )}
                 <View style={{ gap: 3, maxWidth: '90%' }}>
                   {!isMe && (
-                    <Text style={{ color: c.color, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+                    <Text style={{ color: c.color, fontSize: 11, fontFamily: 'Poppins_600SemiBold' }}>
                       {c.username}
                     </Text>
                   )}
@@ -602,7 +747,7 @@ export function ReactionView({
                       borderColor: isMe ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.06)',
                     }}
                   >
-                    <Text style={{ color: Colors.text.primary, fontSize: 14, fontFamily: 'Inter_400Regular' }}>
+                    <Text style={{ color: Colors.text.primary, fontSize: 14, fontFamily: 'Poppins_400Regular' }}>
                       {c.text}
                     </Text>
                   </View>
@@ -612,7 +757,7 @@ export function ReactionView({
           })}
 
           {comments.length === 0 && (
-            <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 8 }}>
+            <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular', textAlign: 'center', marginTop: 8 }}>
               Be first to react 👇
             </Text>
           )}
@@ -636,7 +781,6 @@ export function ReactionView({
             <View style={{ flexDirection: 'row', gap: 6 }}>
               {EMOJIS.map((emoji) => {
                 const count = emojiCounts[emoji] ?? 0;
-                const selected = myReaction === emoji;
                 return (
                   <Pressable
                     key={emoji}
@@ -644,20 +788,18 @@ export function ReactionView({
                     style={{
                       alignItems: 'center',
                       gap: 1,
-                      backgroundColor: selected
-                        ? 'rgba(59,130,246,0.15)'
-                        : 'rgba(255,255,255,0.05)',
+                      backgroundColor: 'rgba(255,255,255,0.05)',
                       borderRadius: 10,
                       paddingHorizontal: 8,
                       paddingVertical: 5,
                       borderWidth: 1,
-                      borderColor: selected ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.07)',
+                      borderColor: 'rgba(255,255,255,0.07)',
                       minWidth: 36,
                     }}
                   >
                     <Text style={{ fontSize: 18 }}>{emoji}</Text>
                     {count > 0 && (
-                      <Text style={{ color: Colors.text.muted, fontSize: 9, fontFamily: 'Inter_700Bold' }}>
+                      <Text style={{ color: Colors.text.muted, fontSize: 9, fontFamily: 'Poppins_700Bold' }}>
                         {count}
                       </Text>
                     )}
@@ -666,6 +808,48 @@ export function ReactionView({
               })}
             </View>
           </View>
+
+          {/* Next Turn vote button */}
+          <Pressable
+            onPress={sendReady}
+            disabled={iAmReady}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              backgroundColor: iAmReady ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)',
+              borderRadius: 12,
+              paddingVertical: 10,
+              borderWidth: 1,
+              borderColor: iAmReady ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)',
+            }}
+          >
+            <Text style={{ fontSize: 16 }}>{iAmReady ? '✅' : '⏭️'}</Text>
+            <Text
+              style={{
+                color: iAmReady ? '#22c55e' : Colors.text.secondary,
+                fontSize: 13,
+                fontFamily: 'Poppins_700Bold',
+              }}
+            >
+              {iAmReady ? 'Voted Next' : 'Next Turn'}
+            </Text>
+            {readyCount > 0 && (
+              <View
+                style={{
+                  backgroundColor: 'rgba(34,197,94,0.15)',
+                  borderRadius: 10,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                }}
+              >
+                <Text style={{ color: '#22c55e', fontSize: 11, fontFamily: 'Poppins_700Bold' }}>
+                  {readyCount}/{readyThreshold}
+                </Text>
+              </View>
+            )}
+          </Pressable>
 
           {/* Comment input */}
           <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
@@ -678,7 +862,7 @@ export function ReactionView({
                 borderColor: commentText ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.08)',
                 color: Colors.text.primary,
                 fontSize: 14,
-                fontFamily: 'Inter_400Regular',
+                fontFamily: 'Poppins_400Regular',
                 paddingHorizontal: 16,
                 paddingVertical: 10,
                 maxHeight: 80,
@@ -718,69 +902,182 @@ export function ReactionView({
 
 export function DareShowView({
   players,
+  myPlayer,
   currentTurnPlayerId,
+  currentRoundId,
   content,
   phaseEndsAt,
+  token,
 }: {
   players: AnonPlayer[];
+  myPlayer: AnonPlayer | null;
   currentTurnPlayerId: string | null;
+  currentRoundId: string | null;
   content: TruthOrDare | null;
   phaseEndsAt: string | null;
+  token: string | null;
 }) {
   const turnPlayer = players.find((p) => p.id === currentTurnPlayerId);
+  const isMyTurn = myPlayer?.id === currentTurnPlayerId;
+  const { secondsLeft } = useGameTimer(phaseEndsAt);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleDareDone = async () => {
+    if (!currentRoundId || !token || submitting || done) return;
+    setSubmitting(true);
+    Haptics.success();
+    try {
+      await fetch(`${API_URL}/game/rounds/${currentRoundId}/dare_done`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setDone(true);
+    } catch { /* WS phase_change will handle transition */ } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Urgency ring color based on time left
+  const urgent = secondsLeft <= 20 && secondsLeft > 0;
+  const ringColor = urgent ? Colors.red : '#8b5cf6';
 
   return (
     <ScrollView
-      contentContainerStyle={{ padding: 20, gap: 20, alignItems: 'center' }}
+      contentContainerStyle={{ padding: 20, gap: 22, alignItems: 'center', paddingBottom: 40 }}
       showsVerticalScrollIndicator={false}
     >
-      <View style={{ alignItems: 'center', gap: 6, paddingTop: 8 }}>
-        <Text style={{ fontSize: 36 }}>🔥</Text>
-        <Text style={{ color: Colors.text.primary, fontSize: 22, fontFamily: 'Syne_800ExtraBold' }}>
-          Dare!
+      {/* Header — who's doing the dare */}
+      <View style={{ alignItems: 'center', gap: 10, paddingTop: 8 }}>
+        <Text style={{ fontSize: 40 }}>{isMyTurn ? '😤' : '👀'}</Text>
+        <Text style={{ color: Colors.text.primary, fontSize: 22, fontFamily: 'Poppins_700Bold', textAlign: 'center' }}>
+          {isMyTurn ? 'Your Dare!' : `${turnPlayer?.username ?? '?'}'s Dare`}
         </Text>
-        {turnPlayer && (
-          <Text style={{ color: Colors.text.muted, fontSize: 14, fontFamily: 'Inter_400Regular' }}>
-            <Text style={{ color: turnPlayer.color, fontFamily: 'Inter_600SemiBold' }}>
-              {turnPlayer.username}
-            </Text>{' '}chose Dare
+        {!isMyTurn && turnPlayer && (
+          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular' }}>
+            Watch and judge 👇
           </Text>
         )}
       </View>
 
+      {/* Dare card */}
       {content && (
         <Animated.View entering={FadeIn.duration(400)} style={{ width: '100%' }}>
           <LinearGradient
-            colors={['rgba(139,92,246,0.15)', 'rgba(139,92,246,0.05)']}
+            colors={['rgba(139,92,246,0.18)', 'rgba(139,92,246,0.06)']}
             style={{
               borderRadius: BorderRadius.card,
-              borderWidth: 1,
-              borderColor: 'rgba(139,92,246,0.3)',
-              padding: 20,
-              gap: 10,
+              borderWidth: isMyTurn ? 2 : 1,
+              borderColor: isMyTurn ? 'rgba(139,92,246,0.6)' : 'rgba(139,92,246,0.3)',
+              padding: 22,
+              gap: 12,
             }}
           >
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ color: 'rgba(139,92,246,0.9)', fontSize: 12, fontFamily: 'Inter_700Bold', letterSpacing: 1 }}>
-                DARE
+              <Text style={{ color: '#a78bfa', fontSize: 11, fontFamily: 'Poppins_700Bold', letterSpacing: 1.5 }}>
+                🔥 DARE
               </Text>
-              <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_500Medium' }}>
+              <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Poppins_500Medium' }}>
                 +{content.points} pts
               </Text>
             </View>
-            <Text style={{ color: Colors.text.primary, fontSize: 18, fontFamily: 'Syne_800ExtraBold', lineHeight: 26 }}>
+            <Text style={{ color: Colors.text.primary, fontSize: 18, fontFamily: 'Poppins_700Bold', lineHeight: 28 }}>
               {content.content}
             </Text>
           </LinearGradient>
         </Animated.View>
       )}
 
-      <View style={{ alignItems: 'center', gap: 8 }}>
-        <TimerPill endsAt={phaseEndsAt} />
-        <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
-          Voting starts soon...
+      {/* Countdown ring + label */}
+      <View style={{ alignItems: 'center', gap: 12 }}>
+        {/* Big countdown number */}
+        <View
+          style={{
+            width: 88,
+            height: 88,
+            borderRadius: 44,
+            borderWidth: 3,
+            borderColor: ringColor + '88',
+            backgroundColor: ringColor + '12',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{
+            color: urgent ? Colors.red : '#a78bfa',
+            fontSize: 32,
+            fontFamily: 'Poppins_700Bold',
+          }}>
+            {secondsLeft > 0 ? secondsLeft : '⚡'}
+          </Text>
+        </View>
+
+        <Text style={{
+          color: urgent ? Colors.red : Colors.text.muted,
+          fontSize: 13,
+          fontFamily: urgent ? 'Poppins_700Bold' : 'Poppins_400Regular',
+          textAlign: 'center',
+        }}>
+          {isMyTurn
+            ? urgent
+              ? '⚠️ Time almost up — finish the dare!'
+              : 'Complete the dare before time runs out'
+            : urgent
+              ? '⚠️ Voting starts very soon!'
+              : 'After time ends, voting begins'}
         </Text>
       </View>
+
+      {/* "You're being watched" note for dare player */}
+      {isMyTurn && (
+        <View style={{
+          backgroundColor: 'rgba(139,92,246,0.08)',
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: 'rgba(139,92,246,0.2)',
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          width: '100%',
+        }}>
+          <Text style={{ color: '#a78bfa', fontSize: 12, fontFamily: 'Poppins_500Medium', textAlign: 'center' }}>
+            👁️ Everyone is watching — do it properly!
+          </Text>
+        </View>
+      )}
+
+      {/* Done button — only dare player sees this */}
+      {isMyTurn && (
+        <Pressable
+          onPress={handleDareDone}
+          disabled={submitting || done}
+          style={{ width: '100%' }}
+        >
+          <LinearGradient
+            colors={done ? ['#16a34a', '#15803d'] : ['#8b5cf6', '#7c3aed']}
+            style={{
+              borderRadius: BorderRadius.btn,
+              paddingVertical: 18,
+              alignItems: 'center',
+              gap: 6,
+              shadowColor: done ? '#16a34a' : '#8b5cf6',
+              shadowOpacity: 0.5,
+              shadowRadius: 20,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: 10,
+              opacity: submitting ? 0.7 : 1,
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 17, fontFamily: 'Poppins_700Bold' }}>
+              {done ? '✅ Done! Voting starting...' : submitting ? 'Starting vote...' : '✅ I Did It! Start Voting'}
+            </Text>
+            {!done && (
+              <Text style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11, fontFamily: 'Poppins_400Regular' }}>
+                Tap when you've completed the dare
+              </Text>
+            )}
+          </LinearGradient>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -821,7 +1118,7 @@ export function DareVoteView({
     if (!currentRoundId || !token || myVote || submitting || isTarget) return;
     setMyVote(value);
     setSubmitting(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.medium();
     try {
       await fetch(`${API_URL}/game/rounds/${currentRoundId}/vote`, {
         method: 'POST',
@@ -840,13 +1137,13 @@ export function DareVoteView({
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ gap: 2 }}>
-          <Text style={{ color: Colors.text.primary, fontSize: 18, fontFamily: 'Syne_800ExtraBold' }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 18, fontFamily: 'Poppins_700Bold' }}>
             Did they do it?
           </Text>
           {turnPlayer && (
-            <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+            <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular' }}>
               Judge{' '}
-              <Text style={{ color: turnPlayer.color, fontFamily: 'Inter_600SemiBold' }}>
+              <Text style={{ color: turnPlayer.color, fontFamily: 'Poppins_600SemiBold' }}>
                 {turnPlayer.username}
               </Text>
             </Text>
@@ -866,10 +1163,10 @@ export function DareVoteView({
             gap: 8,
           }}
         >
-          <Text style={{ color: 'rgba(139,92,246,0.8)', fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 1 }}>
+          <Text style={{ color: 'rgba(139,92,246,0.8)', fontSize: 11, fontFamily: 'Poppins_700Bold', letterSpacing: 1 }}>
             DARE
           </Text>
-          <Text style={{ color: Colors.text.primary, fontSize: 16, fontFamily: 'Syne_800ExtraBold', lineHeight: 22 }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 16, fontFamily: 'Poppins_700Bold', lineHeight: 22 }}>
             {content.content}
           </Text>
         </LinearGradient>
@@ -877,10 +1174,10 @@ export function DareVoteView({
 
       <View style={{ gap: 10 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_500Medium' }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Poppins_500Medium' }}>
             {totalVoted}/{totalVoters} voted
           </Text>
-          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_500Medium' }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Poppins_500Medium' }}>
             YES {yesCount} · NO {noCount}
           </Text>
         </View>
@@ -909,10 +1206,10 @@ export function DareVoteView({
           }}
         >
           <Text style={{ fontSize: 28 }}>👀</Text>
-          <Text style={{ color: Colors.text.primary, fontSize: 15, fontFamily: 'Syne_800ExtraBold' }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 15, fontFamily: 'Poppins_700Bold' }}>
             Class is judging you...
           </Text>
-          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular', textAlign: 'center' }}>
             Did you complete the dare?
           </Text>
         </View>
@@ -927,10 +1224,10 @@ export function DareVoteView({
             borderColor: myVote === 'yes' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
           }}
         >
-          <Text style={{ color: myVote === 'yes' ? Colors.green : Colors.red, fontSize: 15, fontFamily: 'Syne_800ExtraBold' }}>
+          <Text style={{ color: myVote === 'yes' ? Colors.green : Colors.red, fontSize: 15, fontFamily: 'Poppins_700Bold' }}>
             {myVote === 'yes' ? '✅ Voted YES' : '❌ Voted NO'}
           </Text>
-          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4 }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Poppins_400Regular', marginTop: 4 }}>
             Waiting for others...
           </Text>
         </View>
@@ -949,8 +1246,8 @@ export function DareVoteView({
               }}
             >
               <Text style={{ fontSize: 28 }}>🔥</Text>
-              <Text style={{ color: Colors.green, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>YES</Text>
-              <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_400Regular' }}>They did it</Text>
+              <Text style={{ color: Colors.green, fontSize: 16, fontFamily: 'Poppins_700Bold' }}>YES</Text>
+              <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_400Regular' }}>They did it</Text>
             </LinearGradient>
           </Pressable>
           <Pressable onPress={() => castVote('no')} disabled={submitting} style={{ flex: 1 }}>
@@ -966,8 +1263,8 @@ export function DareVoteView({
               }}
             >
               <Text style={{ fontSize: 28 }}>💀</Text>
-              <Text style={{ color: Colors.red, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>NO</Text>
-              <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_400Regular' }}>They chickened</Text>
+              <Text style={{ color: Colors.red, fontSize: 16, fontFamily: 'Poppins_700Bold' }}>NO</Text>
+              <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_400Regular' }}>They chickened</Text>
             </LinearGradient>
           </Pressable>
         </View>
@@ -984,8 +1281,10 @@ export function PunishmentVoteView({
   currentTurnPlayerId,
   phaseEndsAt,
   votes,
-  optionA = 'Option A',
-  optionB = 'Option B',
+  optionA = 'Permanent ban',
+  optionB = 'Identity reveal',
+  token,
+  roomCode,
 }: {
   players: AnonPlayer[];
   myPlayer: AnonPlayer | null;
@@ -994,14 +1293,33 @@ export function PunishmentVoteView({
   votes: import('@/types').Vote[];
   optionA?: string;
   optionB?: string;
+  token: string | null;
+  roomCode: string;
 }) {
   const [myVote, setMyVote] = useState<'a' | 'b' | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const turnPlayer = players.find((p) => p.id === currentTurnPlayerId);
   const isTarget = myPlayer?.id === currentTurnPlayerId;
 
   const aCount = votes.filter((v) => v.value === 'a').length;
   const bCount = votes.filter((v) => v.value === 'b').length;
   const total = votes.length;
+
+  const castVote = async (opt: 'a' | 'b') => {
+    if (!token || myVote || submitting || isTarget) return;
+    setMyVote(opt);
+    setSubmitting(true);
+    Haptics.medium();
+    try {
+      await fetch(`${API_URL}/game/rooms/${roomCode}/punishment_vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ value: opt }),
+      });
+    } catch { /* WS vote_update will reflect */ } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <ScrollView
@@ -1010,13 +1328,13 @@ export function PunishmentVoteView({
     >
       <View style={{ alignItems: 'center', gap: 6 }}>
         <Text style={{ fontSize: 36 }}>⚡</Text>
-        <Text style={{ color: Colors.text.primary, fontSize: 22, fontFamily: 'Syne_800ExtraBold' }}>
+        <Text style={{ color: Colors.text.primary, fontSize: 22, fontFamily: 'Poppins_700Bold' }}>
           Punishment Vote
         </Text>
         {turnPlayer && (
-          <Text style={{ color: Colors.text.muted, fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 14, fontFamily: 'Poppins_400Regular', textAlign: 'center' }}>
             Choose{' '}
-            <Text style={{ color: turnPlayer.color, fontFamily: 'Inter_600SemiBold' }}>
+            <Text style={{ color: turnPlayer.color, fontFamily: 'Poppins_600SemiBold' }}>
               {turnPlayer.username}
             </Text>
             {"'s"} punishment
@@ -1036,16 +1354,16 @@ export function PunishmentVoteView({
             gap: 8,
           }}
         >
-          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center' }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Poppins_500Medium', textAlign: 'center' }}>
             {total} vote{total !== 1 ? 's' : ''} cast
           </Text>
           <View style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden', flexDirection: 'row' }}>
-            <View style={{ flex: aCount + 0.001, backgroundColor: Colors.blue, borderRadius: 3 }} />
-            <View style={{ flex: bCount + 0.001, backgroundColor: 'rgba(139,92,246,0.7)', borderRadius: 3 }} />
+            <View style={{ flex: aCount + 0.001, backgroundColor: Colors.red, borderRadius: 3 }} />
+            <View style={{ flex: bCount + 0.001, backgroundColor: 'rgba(245,158,11,0.8)', borderRadius: 3 }} />
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={{ color: Colors.blue, fontSize: 11, fontFamily: 'Inter_700Bold' }}>A · {aCount}</Text>
-            <Text style={{ color: 'rgba(139,92,246,0.9)', fontSize: 11, fontFamily: 'Inter_700Bold' }}>B · {bCount}</Text>
+            <Text style={{ color: Colors.red, fontSize: 11, fontFamily: 'Poppins_700Bold' }}>🔨 Ban · {aCount}</Text>
+            <Text style={{ color: Colors.yellow, fontSize: 11, fontFamily: 'Poppins_700Bold' }}>🎭 Reveal · {bCount}</Text>
           </View>
         </View>
       )}
@@ -1063,59 +1381,79 @@ export function PunishmentVoteView({
           }}
         >
           <Text style={{ fontSize: 32 }}>😬</Text>
-          <Text style={{ color: Colors.text.primary, fontSize: 16, fontFamily: 'Syne_800ExtraBold', textAlign: 'center' }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 16, fontFamily: 'Poppins_700Bold', textAlign: 'center' }}>
             Class decides your fate...
           </Text>
         </View>
       ) : myVote ? (
         <View
           style={{
-            backgroundColor: Colors.bg.card,
+            backgroundColor: myVote === 'a' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
             borderRadius: BorderRadius.card,
             padding: 20,
             alignItems: 'center',
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.06)',
+            borderColor: myVote === 'a' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)',
           }}
         >
-          <Text style={{ color: Colors.text.primary, fontSize: 15, fontFamily: 'Syne_800ExtraBold' }}>
-            Voted {myVote.toUpperCase()}
+          <Text style={{ color: myVote === 'a' ? Colors.red : Colors.yellow, fontSize: 15, fontFamily: 'Poppins_700Bold' }}>
+            {myVote === 'a' ? '🔨 Voted Ban' : '🎭 Voted Reveal'}
           </Text>
-          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 4 }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular', marginTop: 4 }}>
             Waiting for result...
           </Text>
         </View>
       ) : (
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          {(['a', 'b'] as const).map((opt) => (
-            <Pressable
-              key={opt}
-              onPress={() => setMyVote(opt)}
-              style={{ flex: 1 }}
+          <Pressable
+            key="a"
+            onPress={() => castVote('a')}
+            disabled={submitting}
+            style={{ flex: 1 }}
+          >
+            <LinearGradient
+              colors={['rgba(239,68,68,0.2)', 'rgba(239,68,68,0.06)']}
+              style={{
+                borderRadius: BorderRadius.btn,
+                borderWidth: 1.5,
+                borderColor: 'rgba(239,68,68,0.35)',
+                paddingVertical: 24,
+                alignItems: 'center',
+                gap: 6,
+              }}
             >
-              <LinearGradient
-                colors={
-                  opt === 'a'
-                    ? ['rgba(59,130,246,0.2)', 'rgba(59,130,246,0.06)']
-                    : ['rgba(139,92,246,0.2)', 'rgba(139,92,246,0.06)']
-                }
-                style={{
-                  borderRadius: BorderRadius.btn,
-                  borderWidth: 1.5,
-                  borderColor: opt === 'a' ? 'rgba(59,130,246,0.35)' : 'rgba(139,92,246,0.35)',
-                  paddingVertical: 24,
-                  alignItems: 'center',
-                }}
-              >
-                <Text style={{ color: opt === 'a' ? Colors.blue : 'rgba(139,92,246,0.9)', fontSize: 28, fontFamily: 'Syne_800ExtraBold' }}>
-                  {opt.toUpperCase()}
-                </Text>
-                <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 8 }}>
-                  {opt === 'a' ? optionA : optionB}
-                </Text>
-              </LinearGradient>
-            </Pressable>
-          ))}
+              <Text style={{ fontSize: 28 }}>🔨</Text>
+              <Text style={{ color: Colors.red, fontSize: 15, fontFamily: 'Poppins_700Bold' }}>Ban</Text>
+              <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_400Regular', textAlign: 'center', paddingHorizontal: 8 }}>
+                {optionA}
+              </Text>
+            </LinearGradient>
+          </Pressable>
+
+          <Pressable
+            key="b"
+            onPress={() => castVote('b')}
+            disabled={submitting}
+            style={{ flex: 1 }}
+          >
+            <LinearGradient
+              colors={['rgba(245,158,11,0.2)', 'rgba(245,158,11,0.06)']}
+              style={{
+                borderRadius: BorderRadius.btn,
+                borderWidth: 1.5,
+                borderColor: 'rgba(245,158,11,0.35)',
+                paddingVertical: 24,
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Text style={{ fontSize: 28 }}>🎭</Text>
+              <Text style={{ color: Colors.yellow, fontSize: 15, fontFamily: 'Poppins_700Bold' }}>Reveal</Text>
+              <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_400Regular', textAlign: 'center', paddingHorizontal: 8 }}>
+                {optionB}
+              </Text>
+            </LinearGradient>
+          </Pressable>
         </View>
       )}
     </ScrollView>
@@ -1139,11 +1477,11 @@ export function IdentityRevealView({
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 24 }}>
       <Animated.View entering={FadeIn.duration(400)} style={{ alignItems: 'center', gap: 8 }}>
         <Text style={{ fontSize: 52 }}>🎭</Text>
-        <Text style={{ color: Colors.text.primary, fontSize: 26, fontFamily: 'Syne_800ExtraBold', textAlign: 'center' }}>
+        <Text style={{ color: Colors.text.primary, fontSize: 26, fontFamily: 'Poppins_700Bold', textAlign: 'center' }}>
           Identity Revealed!
         </Text>
         {target && (
-          <Text style={{ color: target.color, fontSize: 16, fontFamily: 'Inter_600SemiBold' }}>
+          <Text style={{ color: target.color, fontSize: 16, fontFamily: 'Poppins_600SemiBold' }}>
             {target.username}
           </Text>
         )}
@@ -1164,19 +1502,19 @@ export function IdentityRevealView({
           }}
         >
           <View style={{ alignItems: 'center', gap: 4 }}>
-            <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_500Medium', letterSpacing: 1 }}>
+            <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_500Medium', letterSpacing: 1 }}>
               REAL NAME
             </Text>
-            <Text style={{ color: Colors.text.primary, fontSize: 24, fontFamily: 'Syne_800ExtraBold' }}>
+            <Text style={{ color: Colors.text.primary, fontSize: 24, fontFamily: 'Poppins_700Bold' }}>
               {reveal.realName}
             </Text>
           </View>
           <View style={{ width: '100%', height: 1, backgroundColor: 'rgba(255,255,255,0.06)' }} />
           <View style={{ alignItems: 'center', gap: 4 }}>
-            <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_500Medium', letterSpacing: 1 }}>
+            <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_500Medium', letterSpacing: 1 }}>
               PHONE
             </Text>
-            <Text style={{ color: Colors.text.primary, fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: 4 }}>
+            <Text style={{ color: Colors.text.primary, fontSize: 20, fontFamily: 'Poppins_700Bold', letterSpacing: 4 }}>
               ···· ···· ···· {reveal.phoneLast4}
             </Text>
           </View>
@@ -1195,7 +1533,7 @@ export function IdentityRevealView({
           }}
         >
           <ActivityIndicator color={Colors.red} />
-          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular' }}>
             Revealing identity...
           </Text>
         </View>
@@ -1247,11 +1585,11 @@ export function PunishmentBanner({
     >
       <Text style={{ fontSize: 22 }}>{isBan ? '🔨' : '🎭'}</Text>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: isBan ? Colors.red : Colors.yellow, fontSize: 14, fontFamily: 'Syne_800ExtraBold' }}>
+        <Text style={{ color: isBan ? Colors.red : Colors.yellow, fontSize: 14, fontFamily: 'Poppins_700Bold' }}>
           {isBan ? 'Player Banned' : 'Identity Revealing...'}
         </Text>
         {target && (
-          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Poppins_400Regular' }}>
             {target.username} {isBan ? 'has been removed' : "'s identity is revealed"}
           </Text>
         )}

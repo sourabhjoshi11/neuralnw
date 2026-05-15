@@ -12,9 +12,10 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+
 import { AnimatedWheel } from '@/components/ui/AnimatedWheel';
 import { Colors, SpringConfig } from '@/constants/theme';
+import { Haptics, shareText, copyToClipboard } from '@/utils/compat';
 
 const { width, height } = Dimensions.get('window');
 
@@ -97,7 +98,7 @@ function SocialProof() {
           marginLeft: 4,
         }}
       >
-        <Text style={{ color: Colors.blue, fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>
+        <Text style={{ color: Colors.blue, fontSize: 12, fontFamily: 'Poppins_600SemiBold' }}>
           2400+ playing
         </Text>
       </View>
@@ -124,7 +125,7 @@ function PrimaryButton({ label, onPress }: { label: string; onPress: () => void 
   return (
     <Pressable
       onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Haptics.medium();
         onPress();
       }}
       onPressIn={() => { scale.value = withSpring(0.95, SpringConfig.snappy); }}
@@ -147,7 +148,7 @@ function PrimaryButton({ label, onPress }: { label: string; onPress: () => void 
             elevation: 10,
           }}
         >
-          <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>
+          <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'Poppins_700Bold' }}>
             {label}
           </Text>
         </LinearGradient>
@@ -224,10 +225,10 @@ export default function LandingScreen() {
         {/* Wordmark */}
         <Animated.View style={[{ alignItems: 'center', gap: 10 }, titleStyle]}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ color: '#f1f5f9', fontSize: 46, fontFamily: 'Syne_800ExtraBold', letterSpacing: -1 }}>
+            <Text style={{ color: '#f1f5f9', fontSize: 46, fontFamily: 'Poppins_700Bold', letterSpacing: -1 }}>
               Class
             </Text>
-            <Text style={{ fontSize: 46, fontFamily: 'Syne_800ExtraBold', color: '#3b82f6', letterSpacing: -1 }}>
+            <Text style={{ fontSize: 46, fontFamily: 'Poppins_700Bold', color: '#3b82f6', letterSpacing: -1 }}>
               CHAOS
             </Text>
           </View>
@@ -235,7 +236,7 @@ export default function LandingScreen() {
           <Animated.View style={[{ alignItems: 'center', gap: 6 }, taglineStyle]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <View style={{ height: 1, width: 36, backgroundColor: 'rgba(255,255,255,0.15)' }} />
-              <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+              <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Poppins_400Regular' }}>
                 Turn boring lectures into chaos
               </Text>
               <View style={{ height: 1, width: 36, backgroundColor: 'rgba(255,255,255,0.15)' }} />
@@ -256,14 +257,14 @@ export default function LandingScreen() {
           />
           <Pressable
             onPress={() => {
-              Haptics.selectionAsync();
+              Haptics.selection();
               router.push('/(auth)/phone');
             }}
             style={{ alignItems: 'center', paddingVertical: 8 }}
           >
-            <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Inter_500Medium' }}>
+            <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Poppins_500Medium' }}>
               Already have an account?{' '}
-              <Text style={{ color: Colors.blue, fontFamily: 'Inter_600SemiBold' }}>Sign in</Text>
+              <Text style={{ color: Colors.blue, fontFamily: 'Poppins_600SemiBold' }}>Sign in</Text>
             </Text>
           </Pressable>
         </Animated.View>

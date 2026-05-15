@@ -1,34 +1,48 @@
-from twilio.rest import Client
+# import httpx
+# from app.core.config import settings
 
-from app.core.config import settings
-
-_client: Client | None = None
-
-
-def _get_client() -> Client:
-    global _client
-    if _client is None:
-        _client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-    return _client
+# TODO: Uncomment and configure once MSG91 DLT registration is approved.
+# _MSG91_BASE = "https://control.msg91.com/api/v5/otp"
 
 
 async def send_otp(phone: str) -> bool:
-    try:
-        client = _get_client()
-        client.verify.v2.services(settings.TWILIO_VERIFY_SID).verifications.create(
-            to=phone, channel="sms"
-        )
-        return True
-    except Exception:
-        return False
+    """MOCKED — always returns True until MSG91 DLT is approved."""
+    return True
 
 
 async def verify_otp(phone: str, code: str) -> bool:
-    try:
-        client = _get_client()
-        result = client.verify.v2.services(settings.TWILIO_VERIFY_SID).verification_checks.create(
-            to=phone, code=code
-        )
-        return result.status == "approved"
-    except Exception:
-        return False
+    """MOCKED — accepts '123456' as the valid OTP for any phone number."""
+    return code == "123456"
+
+# ── MSG91 implementation (enable after DLT approval) ──────────────────────────
+#
+# async def send_otp(phone: str) -> bool:
+#     """Send OTP via MSG91. Phone must be digits only e.g. 919876543210."""
+#     try:
+#         async with httpx.AsyncClient(timeout=10) as client:
+#             resp = await client.post(
+#                 _MSG91_BASE,
+#                 headers={"authkey": settings.MSG91_AUTH_KEY, "accept": "application/json"},
+#                 json={
+#                     "template_id": settings.MSG91_TEMPLATE_ID,
+#                     "mobile": phone,
+#                     "otp_length": 6,
+#                     "otp_expiry": 10,
+#                 },
+#             )
+#             return resp.json().get("type") == "success"
+#     except Exception:
+#         return False
+#
+# async def verify_otp(phone: str, code: str) -> bool:
+#     """Verify OTP via MSG91."""
+#     try:
+#         async with httpx.AsyncClient(timeout=10) as client:
+#             resp = await client.post(
+#                 f"{_MSG91_BASE}/verify",
+#                 headers={"authkey": settings.MSG91_AUTH_KEY, "accept": "application/json"},
+#                 json={"mobile": phone, "otp": code},
+#             )
+#             return resp.json().get("type") == "success"
+#     except Exception:
+#         return False

@@ -37,8 +37,11 @@ export type Room = {
 
 export type GamePhase =
   | 'lobby'
+  | 'waiting_spin'
   | 'spinning'
   | 'choice'
+  | 'custom_vote'
+  | 'suggestion'
   | 'truth_question'
   | 'truth_answer'
   | 'truth_revealed'
@@ -84,6 +87,7 @@ export type Feed = {
   adminId: string;
   name: string;
   memberCount: number;
+  pinnedMessageId: string | null;
   createdAt: string;
 };
 
@@ -95,8 +99,28 @@ export type FeedMessage = {
   content: string;
   replyToId: string | null;
   reactions: Record<string, number>;
+  isPinned: boolean;
+  editedAt: string | null;
   createdAt: string;
   expiresAt: string;
+};
+
+export type FeedMember = {
+  id: string;
+  feedId: string;
+  userId: string;
+  username: string;
+  isAdmin: boolean;
+  weeklyMessageCount: number;
+  joinedAt?: string;
+};
+
+// Kept minimal — custom suggestion flow no longer has per-suggestion voting
+export type Suggestion = {
+  id: string;
+  playerId: string;
+  username: string;
+  content: string;
 };
 
 export type WSMessage =
@@ -121,6 +145,9 @@ export type WSMessage =
   | { type: 'player_colors_shuffle'; data: { color_map: Record<string, string> } }
   | { type: 'dare_result'; data: Record<string, unknown> }
   | { type: 'skip_life_used'; data: Record<string, unknown> }
+  | { type: 'ready_update'; data: Record<string, unknown> }
+  | { type: 'custom_vote_update'; data: Record<string, unknown> }
+  | { type: 'suggestion_submitted'; data: { round_id: string } }
   | { type: 'error'; data: { message: string } }
   | { type: 'ping'; data: Record<string, never> }
   | { type: 'pong'; data: Record<string, never> };

@@ -43,11 +43,11 @@ function SettingRow({
         <Ionicons name={icon} size={18} color={Colors.blue} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: Colors.text.primary, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
+        <Text style={{ color: Colors.text.primary, fontSize: 14, fontFamily: 'Poppins_600SemiBold' }}>
           {label}
         </Text>
         {sublabel && (
-          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Poppins_400Regular' }}>
             {sublabel}
           </Text>
         )}
@@ -110,12 +110,12 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg.primary }}>
       <ScrollView contentContainerStyle={{ padding: 20, gap: 24 }} showsVerticalScrollIndicator={false}>
-        <Text style={{ color: Colors.text.primary, fontSize: 28, fontFamily: 'Syne_800ExtraBold' }}>
+        <Text style={{ color: Colors.text.primary, fontSize: 28, fontFamily: 'Poppins_700Bold' }}>
           Settings
         </Text>
 
         <View style={{ gap: 4 }}>
-          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_600SemiBold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
             Game Preferences
           </Text>
           <View
@@ -183,7 +183,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={{ gap: 4 }}>
-          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+          <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_600SemiBold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
             Account
           </Text>
           <View
@@ -215,10 +215,10 @@ export default function SettingsScreen() {
             gap: 8,
           }}
         >
-          <Text style={{ color: Colors.blue, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>
+          <Text style={{ color: Colors.blue, fontSize: 16, fontFamily: 'Poppins_700Bold' }}>
             ⭐ Go Premium — ₹29/month
           </Text>
-          <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 20 }}>
+          <Text style={{ color: Colors.text.secondary, fontSize: 13, fontFamily: 'Poppins_400Regular', lineHeight: 20 }}>
             • No pre-game ads{'\n'}• 4 free skips per game{'\n'}• Unlimited Class Feed messages
           </Text>
           <Pressable>
@@ -231,7 +231,7 @@ export default function SettingsScreen() {
                 marginTop: 4,
               }}
             >
-              <Text style={{ color: '#fff', fontSize: 14, fontFamily: 'Syne_800ExtraBold' }}>
+              <Text style={{ color: '#fff', fontSize: 14, fontFamily: 'Poppins_700Bold' }}>
                 Upgrade Now
               </Text>
             </View>

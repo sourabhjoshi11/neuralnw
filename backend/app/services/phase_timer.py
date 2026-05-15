@@ -60,9 +60,11 @@ phase_timer = PhaseTimer()
 PHASE_DURATIONS: dict[str, float] = {
     "spinning": 4,
     "choice": 30,
+    "custom_vote": 15,
+    "suggestion": 20,
     "truth_question": 5,
     "truth_answer": 120,
-    "dare_show": 5,
+    "dare_show": 90,
     "dare_vote": 60,
     "reaction": 60,
     "punishment_vote": 30,

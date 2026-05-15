@@ -61,7 +61,7 @@ export function AdGate({ visible, onDismiss }: { visible: boolean; onDismiss: ()
             style={{
               color: Colors.text.muted,
               fontSize: 11,
-              fontFamily: 'Inter_600SemiBold',
+              fontFamily: 'Poppins_600SemiBold',
               letterSpacing: 1.2,
               textTransform: 'uppercase',
             }}
@@ -89,7 +89,7 @@ export function AdGate({ visible, onDismiss }: { visible: boolean; onDismiss: ()
               style={{
                 color: Colors.text.muted,
                 fontSize: 13,
-                fontFamily: 'Inter_400Regular',
+                fontFamily: 'Poppins_400Regular',
               }}
             >
               Ad plays here
@@ -100,7 +100,7 @@ export function AdGate({ visible, onDismiss }: { visible: boolean; onDismiss: ()
             style={{
               color: Colors.text.secondary,
               fontSize: 13,
-              fontFamily: 'Inter_400Regular',
+              fontFamily: 'Poppins_400Regular',
               textAlign: 'center',
             }}
           >
@@ -120,7 +120,7 @@ export function AdGate({ visible, onDismiss }: { visible: boolean; onDismiss: ()
               justifyContent: 'center',
             }}
           >
-            <Text style={{ color: Colors.blue, fontSize: 24, fontFamily: 'Syne_800ExtraBold' }}>
+            <Text style={{ color: Colors.blue, fontSize: 24, fontFamily: 'Poppins_700Bold' }}>
               {countdown}
             </Text>
           </View>
@@ -147,7 +147,7 @@ export function AdGate({ visible, onDismiss }: { visible: boolean; onDismiss: ()
             style={{
               color: Colors.text.muted,
               fontSize: 11,
-              fontFamily: 'Inter_400Regular',
+              fontFamily: 'Poppins_400Regular',
               textAlign: 'center',
             }}
           >

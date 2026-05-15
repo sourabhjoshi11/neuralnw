@@ -34,7 +34,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             style={{
               color: Colors.text.primary,
               fontSize: 22,
-              fontFamily: 'Syne_800ExtraBold',
+              fontFamily: 'Poppins_700Bold',
               textAlign: 'center',
             }}
           >
@@ -44,7 +44,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             style={{
               color: Colors.text.secondary,
               fontSize: 14,
-              fontFamily: 'Inter_400Regular',
+              fontFamily: 'Poppins_400Regular',
               textAlign: 'center',
               lineHeight: 22,
             }}
@@ -61,7 +61,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
               }}
             >
               <Text
-                style={{ color: '#fff', fontSize: 15, fontFamily: 'Syne_800ExtraBold' }}
+                style={{ color: '#fff', fontSize: 15, fontFamily: 'Poppins_700Bold' }}
               >
                 Try Again
               </Text>

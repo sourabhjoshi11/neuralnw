@@ -29,12 +29,17 @@ module.exports = {
         red: '#ef4444',
       },
       fontFamily: {
-        syne: ['Syne_800ExtraBold', 'Syne_900Black'],
-        'syne-black': ['Syne_900Black'],
-        inter: ['Inter_400Regular'],
-        'inter-medium': ['Inter_500Medium'],
-        'inter-semibold': ['Inter_600SemiBold'],
-        'inter-bold': ['Inter_700Bold'],
+        sans: ['Poppins_400Regular'],
+        poppins: ['Poppins_400Regular'],
+        'poppins-medium': ['Poppins_500Medium'],
+        'poppins-semibold': ['Poppins_600SemiBold'],
+        'poppins-bold': ['Poppins_700Bold'],
+        // Legacy aliases kept for backward compat — both map to Poppins now
+        syne: ['Poppins_700Bold'],
+        inter: ['Poppins_400Regular'],
+        'inter-medium': ['Poppins_500Medium'],
+        'inter-semibold': ['Poppins_600SemiBold'],
+        'inter-bold': ['Poppins_700Bold'],
       },
       borderRadius: {
         btn: '18px',

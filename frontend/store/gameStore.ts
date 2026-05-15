@@ -21,6 +21,10 @@ type GameState = {
   isConnected: boolean;
   isReconnecting: boolean;
   reconnectAttempts: number;
+  readyVotes: { count: number; total: number; threshold: number };
+  customVote: { yes: number; no: number; total: number; threshold: number };
+  suggesterPlayerId: string | null;
+  isSuggestionSubmitted: boolean;
 
   setRoom: (room: Room) => void;
   setPlayers: (players: AnonPlayer[]) => void;
@@ -42,6 +46,12 @@ type GameState = {
   setReconnecting: (reconnecting: boolean) => void;
   incrementReconnectAttempts: () => void;
   resetReconnectAttempts: () => void;
+  setReadyVotes: (count: number, total: number, threshold: number) => void;
+  clearReadyVotes: () => void;
+  setCustomVote: (yes: number, no: number, total: number, threshold: number) => void;
+  clearCustomVote: () => void;
+  setSuggesterPlayerId: (playerId: string | null) => void;
+  setSuggestionSubmitted: (done: boolean) => void;
   clearGame: () => void;
 };
 
@@ -63,6 +73,10 @@ const initialState = {
   isConnected: false,
   isReconnecting: false,
   reconnectAttempts: 0,
+  readyVotes: { count: 0, total: 0, threshold: 1 },
+  customVote: { yes: 0, no: 0, total: 0, threshold: 1 },
+  suggesterPlayerId: null as string | null,
+  isSuggestionSubmitted: false,
 };
 
 export const useGameStore = create<GameState>()(
@@ -138,6 +152,22 @@ export const useGameStore = create<GameState>()(
         set((state) => ({ reconnectAttempts: state.reconnectAttempts + 1 })),
 
       resetReconnectAttempts: () => set({ reconnectAttempts: 0, isReconnecting: false }),
+
+      setReadyVotes: (count, total, threshold) =>
+        set({ readyVotes: { count, total, threshold } }),
+
+      clearReadyVotes: () =>
+        set({ readyVotes: { count: 0, total: 0, threshold: 1 } }),
+
+      setCustomVote: (yes, no, total, threshold) =>
+        set({ customVote: { yes, no, total, threshold } }),
+
+      clearCustomVote: () =>
+        set({ customVote: { yes: 0, no: 0, total: 0, threshold: 1 } }),
+
+      setSuggesterPlayerId: (suggesterPlayerId) => set({ suggesterPlayerId }),
+
+      setSuggestionSubmitted: (isSuggestionSubmitted) => set({ isSuggestionSubmitted }),
 
       clearGame: () => set(initialState),
     }),

@@ -18,7 +18,7 @@ export function Badge({ label, color = '#3b82f6' }: Props) {
         alignSelf: 'flex-start',
       }}
     >
-      <Text style={{ color, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>{label}</Text>
+      <Text style={{ color, fontSize: 11, fontFamily: 'Poppins_600SemiBold' }}>{label}</Text>
     </View>
   );
 }

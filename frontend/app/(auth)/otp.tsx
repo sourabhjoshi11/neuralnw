@@ -116,10 +116,10 @@ export default function OtpScreen() {
     >
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 32 }}>
         <View style={{ gap: 8 }}>
-          <Text style={{ color: Colors.text.primary, fontSize: 32, fontFamily: 'Syne_800ExtraBold' }}>
+          <Text style={{ color: Colors.text.primary, fontSize: 32, fontFamily: 'Poppins_700Bold' }}>
             Verify OTP
           </Text>
-          <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Inter_400Regular' }}>
+          <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Poppins_400Regular' }}>
             Enter the 6-digit code sent to {phone}
           </Text>
         </View>
@@ -138,7 +138,7 @@ export default function OtpScreen() {
                 borderColor: digit ? 'rgba(59,130,246,0.5)' : 'rgba(255,255,255,0.07)',
                 color: Colors.text.primary,
                 fontSize: 22,
-                fontFamily: 'Inter_700Bold',
+                fontFamily: 'Poppins_700Bold',
                 textAlign: 'center',
               }}
               maxLength={1}
@@ -174,7 +174,7 @@ export default function OtpScreen() {
                 elevation: isComplete ? 8 : 0,
               }}
             >
-              <Text style={{ color: isComplete ? '#fff' : Colors.text.muted, fontSize: 16, fontFamily: 'Syne_800ExtraBold' }}>
+              <Text style={{ color: isComplete ? '#fff' : Colors.text.muted, fontSize: 16, fontFamily: 'Poppins_700Bold' }}>
                 {loading ? 'Verifying...' : 'Verify →'}
               </Text>
             </LinearGradient>
@@ -182,7 +182,7 @@ export default function OtpScreen() {
         </Pressable>
 
         <Pressable onPress={handleResend} disabled={resendTimer > 0}>
-          <Text style={{ textAlign: 'center', color: resendTimer > 0 ? Colors.text.muted : Colors.blue, fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>
+          <Text style={{ textAlign: 'center', color: resendTimer > 0 ? Colors.text.muted : Colors.blue, fontFamily: 'Poppins_600SemiBold', fontSize: 14 }}>
             {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
           </Text>
         </Pressable>

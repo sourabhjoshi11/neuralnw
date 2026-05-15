@@ -6,9 +6,10 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+
 import { useAuthStore } from '@/store/authStore';
 import { Colors, SpringConfig } from '@/constants/theme';
+import { Haptics, shareText, copyToClipboard } from '@/utils/compat';
 
 type TabIconProps = {
   name: keyof typeof Ionicons.glyphMap;
@@ -41,7 +42,7 @@ function TabIcon({ name, focused, label }: TabIconProps) {
       <Text
         style={{
           fontSize: 10,
-          fontFamily: 'Inter_500Medium',
+          fontFamily: 'Poppins_500Medium',
           color: focused ? Colors.blue : Colors.text.muted,
         }}
       >
@@ -87,7 +88,7 @@ export default function TabsLayout() {
           <Pressable
             {...props}
             onPress={(e) => {
-              Haptics.selectionAsync();
+              Haptics.selection();
               props.onPress?.(e);
             }}
           />

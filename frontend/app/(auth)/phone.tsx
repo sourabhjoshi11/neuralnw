@@ -49,10 +49,10 @@ export default function PhoneScreen() {
       >
         <View style={{ gap: 32 }}>
           <View style={{ gap: 8 }}>
-            <Text style={{ color: Colors.text.primary, fontSize: 32, fontFamily: 'Syne_800ExtraBold' }}>
+            <Text style={{ color: Colors.text.primary, fontSize: 32, fontFamily: 'Poppins_700Bold' }}>
               Enter your number
             </Text>
-            <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Inter_400Regular' }}>
+            <Text style={{ color: Colors.text.secondary, fontSize: 14, fontFamily: 'Poppins_400Regular' }}>
               We'll send a verification code via SMS
             </Text>
           </View>
@@ -77,7 +77,7 @@ export default function PhoneScreen() {
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ color: Colors.text.primary, fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>
+              <Text style={{ color: Colors.text.primary, fontFamily: 'Poppins_600SemiBold', fontSize: 16 }}>
                 🇮🇳 +91
               </Text>
             </View>
@@ -86,7 +86,7 @@ export default function PhoneScreen() {
                 flex: 1,
                 color: Colors.text.primary,
                 fontSize: 18,
-                fontFamily: 'Inter_500Medium',
+                fontFamily: 'Poppins_500Medium',
                 paddingHorizontal: 16,
                 paddingVertical: 14,
               }}
@@ -126,7 +126,7 @@ export default function PhoneScreen() {
                   style={{
                     color: isValid ? '#fff' : Colors.text.muted,
                     fontSize: 16,
-                    fontFamily: 'Syne_800ExtraBold',
+                    fontFamily: 'Poppins_700Bold',
                   }}
                 >
                   {loading ? 'Sending...' : 'Send OTP →'}
@@ -139,7 +139,7 @@ export default function PhoneScreen() {
             style={{
               color: Colors.text.muted,
               fontSize: 12,
-              fontFamily: 'Inter_400Regular',
+              fontFamily: 'Poppins_400Regular',
               textAlign: 'center',
               lineHeight: 18,
             }}
