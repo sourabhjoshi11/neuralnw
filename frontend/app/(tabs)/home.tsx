@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, SafeAreaView } from 'react-native';
+import type { ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import Animated, {
   useSharedValue,
@@ -7,6 +8,7 @@ import Animated, {
   withSpring,
   withDelay,
 } from 'react-native-reanimated';
+import type { AnimatedStyle } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Card, Badge, GradientButton } from '@/components/ui';
@@ -45,7 +47,7 @@ type GameCardProps = {
   badge: string;
   badgeColor: string;
   gradientColors: [string, string];
-  animStyle: ReturnType<typeof useAnimatedStyle>;
+  animStyle: AnimatedStyle<ViewStyle>;
   onPress: () => void;
   onPressSecondary?: { label: string; onPress: () => void };
 };
@@ -189,8 +191,8 @@ function StatPill({ emoji, label }: { emoji: string; label: string }) {
 }
 
 export default function HomeScreen() {
-  // 0=header, 1=pills, 2=card1, 3=card2, 4=section title, 5=quick action row
-  const anims = useStaggeredEntrance(6, 80);
+  // 0=header, 1=pills, 2=section title, 3-5=game cards, 6=quick action row
+  const anims = useStaggeredEntrance(7, 80);
   const randomAvatar = ANON_AVATARS[Math.floor(Math.random() * ANON_AVATARS.length)];
 
   return (
@@ -238,7 +240,7 @@ export default function HomeScreen() {
         </Animated.View>
 
         {/* Section label */}
-        <Animated.View style={anims[4]}>
+        <Animated.View style={anims[2]}>
           <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>
             Choose Your Game
           </Text>
@@ -250,9 +252,9 @@ export default function HomeScreen() {
           title="Spin the Bottle"
           subtitle="Truth or Dare with your class — anonymous spins, wild reactions"
           badge="MULTIPLAYER"
-          badgeColor={Colors.blue}
-          gradientColors={['#3b82f6', '#06b6d4']}
-          animStyle={anims[2]}
+          badgeColor={Colors.yellow}
+          gradientColors={['#f59e0b', '#ec4899']}
+          animStyle={anims[3]}
           onPress={() => router.push('/game/create')}
           onPressSecondary={{ label: 'Join', onPress: () => router.push('/game/join') }}
         />
@@ -264,24 +266,41 @@ export default function HomeScreen() {
           badge="SOCIAL"
           badgeColor={Colors.cyan}
           gradientColors={['#06b6d4', '#8b5cf6']}
-          animStyle={anims[3]}
+          animStyle={anims[4]}
           onPress={() => router.push('/feed/create')}
           onPressSecondary={{ label: 'Join', onPress: () => router.push('/feed/join') }}
         />
 
+        <GameCard
+          emoji="👑"
+          title="Harami vs Shurta"
+          subtitle="Raja, Mantri, Sipahi and Chor — find the harami before they escape"
+          badge="ROLEPLAY"
+          badgeColor={Colors.purple}
+          gradientColors={['#7c3aed', '#ec4899']}
+          animStyle={anims[5]}
+          onPress={() => router.push('/chor-sipahi/create')}
+          onPressSecondary={{ label: 'Join', onPress: () => router.push('/chor-sipahi/join') }}
+        />
+
         {/* Quick actions */}
-        <Animated.View style={[{ gap: 10 }, anims[5]]}>
+        <Animated.View style={[{ gap: 10 }, anims[6]]}>
           <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>
             Quick Join
           </Text>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 12, paddingRight: 4 }}
+          >
             {[
-              { emoji: '🎯', label: 'Join Game', route: '/game/join', color: Colors.blue },
+              { emoji: '🎯', label: 'Join Spin ', route: '/game/join', color: Colors.blue },
               { emoji: '📱', label: 'Join Feed', route: '/feed/join', color: Colors.cyan },
+              { emoji: '👑', label: 'Join H vs S', route: '/chor-sipahi/join', color: Colors.purple },
             ].map(({ emoji, label, route, color }) => (
               <Pressable
                 key={route}
-                style={{ flex: 1 }}
+                style={{ width: 132 }}
                 onPress={() => {
                   Haptics.light();
                   router.push(route as any);
@@ -305,7 +324,7 @@ export default function HomeScreen() {
                 </View>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
         </Animated.View>
       </ScrollView>
     </SafeAreaView>

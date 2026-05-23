@@ -4,36 +4,48 @@
  */
 import { Platform } from 'react-native';
 import * as ExpoHaptics from 'expo-haptics';
+import { useSettingsStore } from '@/store/settingsStore';
+
+function hapticsEnabled() {
+  return useSettingsStore.getState().vibrationEnabled;
+}
 
 // ─── Haptics ─────────────────────────────────────────────────────────────────
 
 export const Haptics = {
   light: () => {
     if (Platform.OS === 'web') return;
+    if (!hapticsEnabled()) return;
     ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Light).catch(() => {});
   },
   medium: () => {
     if (Platform.OS === 'web') return;
+    if (!hapticsEnabled()) return;
     ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Medium).catch(() => {});
   },
   heavy: () => {
     if (Platform.OS === 'web') return;
+    if (!hapticsEnabled()) return;
     ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Heavy).catch(() => {});
   },
   selection: () => {
     if (Platform.OS === 'web') return;
+    if (!hapticsEnabled()) return;
     ExpoHaptics.selectionAsync().catch(() => {});
   },
   success: () => {
     if (Platform.OS === 'web') return;
+    if (!hapticsEnabled()) return;
     ExpoHaptics.notificationAsync(ExpoHaptics.NotificationFeedbackType.Success).catch(() => {});
   },
   error: () => {
     if (Platform.OS === 'web') return;
+    if (!hapticsEnabled()) return;
     ExpoHaptics.notificationAsync(ExpoHaptics.NotificationFeedbackType.Error).catch(() => {});
   },
   warning: () => {
     if (Platform.OS === 'web') return;
+    if (!hapticsEnabled()) return;
     ExpoHaptics.notificationAsync(ExpoHaptics.NotificationFeedbackType.Warning).catch(() => {});
   },
 };

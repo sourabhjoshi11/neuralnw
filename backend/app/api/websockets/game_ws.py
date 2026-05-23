@@ -16,26 +16,40 @@ from app.services.room_manager import room_manager
 
 
 async def game_ws_handler(ws: WebSocket, room_code: str, db: AsyncSession) -> None:
+    # Accept first so the client receives proper WebSocket close frames
+    # (without accept(), Starlette returns HTTP 403 which the client can't distinguish)
+    await ws.accept()
+
     # Authenticate via query param token
     token = ws.query_params.get("token", "")
-    player_id = ws.query_params.get("pid", "")
 
     try:
         payload = decode_access_token(token)
         user_id: str = payload["sub"]
     except (JWTError, KeyError):
+        print(f"[WS] Auth failed for room {room_code}: invalid token")
+        await ws.send_text(json.dumps({"type": "error", "code": 4001, "reason": "invalid_token"}))
         await ws.close(code=4001)
         return
 
     user_result = await db.execute(select(User).where(User.id == user_id))
     user = user_result.scalar_one_or_none()
     if not user or user.is_banned:
+        print(f"[WS] Auth failed for room {room_code}: user not found or banned (uid={user_id})")
+        await ws.send_text(json.dumps({"type": "error", "code": 4003, "reason": "user_not_found"}))
         await ws.close(code=4003)
         return
 
     room_result = await db.execute(select(Room).where(Room.code == room_code))
     room = room_result.scalar_one_or_none()
-    if not room or room.status == "ended":
+    if not room:
+        print(f"[WS] Room not found: {room_code}")
+        await ws.send_text(json.dumps({"type": "error", "code": 4004, "reason": "room_not_found"}))
+        await ws.close(code=4004)
+        return
+    if room.status == "ended":
+        print(f"[WS] Room {room_code} has ended")
+        await ws.send_text(json.dumps({"type": "error", "code": 4004, "reason": "room_ended"}))
         await ws.close(code=4004)
         return
 
@@ -44,10 +58,10 @@ async def game_ws_handler(ws: WebSocket, room_code: str, db: AsyncSession) -> No
     )
     player = player_result.scalar_one_or_none()
     if not player:
+        print(f"[WS] Player not found in room {room_code} for user {user_id}")
+        await ws.send_text(json.dumps({"type": "error", "code": 4005, "reason": "not_a_member"}))
         await ws.close(code=4005)
         return
-
-    await ws.accept()
     room_manager.connect(room_code, player.id, ws)
 
     # Send full state snapshot to the connecting client for reconnect

@@ -101,6 +101,11 @@ export type FeedMessage = {
   reactions: Record<string, number>;
   isPinned: boolean;
   editedAt: string | null;
+  msgType: 'text' | 'poll' | 'image' | 'voice';
+  pollOptions: string[] | null;
+  pollVotes: Record<string, string[]> | null;
+  mediaUrl: string | null;
+  seenBy: string[];
   createdAt: string;
   expiresAt: string;
 };
@@ -139,6 +144,7 @@ export type WSMessage =
   | { type: 'phase_change'; data: Record<string, unknown> }
   | { type: 'points_update'; data: Record<string, unknown> }
   | { type: 'blackout_start'; data: Record<string, unknown> }
+  | { type: 'blackout_end'; data: Record<string, unknown> }
   | { type: 'punishment_vote_result'; data: { result: 'ban' | 'reveal'; targetId: string } }
   | { type: 'identity_reveal'; data: { playerId: string; realName: string; phoneLast4: string } }
   | { type: 'game_end'; data: Record<string, unknown> }

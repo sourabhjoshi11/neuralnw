@@ -17,6 +17,9 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { useSession } from '@/hooks/useSession';
 import { useAuthStore } from '@/store/authStore';
+import { useSettingsStore } from '@/store/settingsStore';
+import { applyTheme, Colors } from '@/constants/theme';
+import * as SystemUI from 'expo-system-ui';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -24,6 +27,8 @@ export default function RootLayout() {
   useSession(); // validates persisted token on start
 
   const isLoading = useAuthStore((s) => s.isLoading);
+  const theme = useSettingsStore((s) => s.theme);
+  applyTheme(theme);
 
   const [fontsLoaded, fontError] = useFonts({
     Poppins_400Regular,
@@ -33,6 +38,11 @@ export default function RootLayout() {
   });
 
   const ready = (fontsLoaded || !!fontError) && !isLoading;
+
+  useEffect(() => {
+    applyTheme(theme);
+    SystemUI.setBackgroundColorAsync(Colors.bg.primary).catch(() => {});
+  }, [theme]);
 
   useEffect(() => {
     if (ready) {
@@ -45,11 +55,12 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="light" backgroundColor="#0a0e1a" />
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={Colors.bg.primary} />
       <Stack
+        key={theme}
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#0a0e1a' },
+          contentStyle: { backgroundColor: Colors.bg.primary },
           animation: 'slide_from_right',
         }}
       >
@@ -58,6 +69,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="game" />
         <Stack.Screen name="feed" />
+        <Stack.Screen name="chor-sipahi" />
       </Stack>
     </GestureHandlerRootView>
     </ErrorBoundary>

@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, SafeAreaView, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Pressable, SafeAreaView, FlatList, ActivityIndicator, Alert, Modal, Image, Switch } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Haptics, shareText } from '@/utils/compat';
+import { Haptics, shareText, copyToClipboard } from '@/utils/compat';
 import { Colors, BorderRadius } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 import { useFeedStore } from '@/store/feedStore';
@@ -24,6 +24,63 @@ type Member = {
   joined_at: string;
 };
 
+function QRModal({ code, visible, onClose }: { code: string; visible: boolean; onClose: () => void }) {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(`classchaos://feed/join?code=${code}`)}`;
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' }} onPress={onClose}>
+        <Pressable onPress={(e) => e.stopPropagation()}>
+          <View style={{
+            backgroundColor: Colors.bg.card,
+            borderRadius: 24, padding: 28, alignItems: 'center', gap: 18,
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+            width: 300,
+          }}>
+            <Text style={{ color: Colors.text.primary, fontSize: 18, fontFamily: 'Poppins_700Bold' }}>Scan to Join</Text>
+
+            {/* QR Code */}
+            <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 8 }}>
+              <Image
+                source={{ uri: qrUrl }}
+                style={{ width: 220, height: 220 }}
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Feed code */}
+            <View style={{ alignItems: 'center', gap: 4 }}>
+              <Text style={{ color: Colors.text.muted, fontSize: 12, fontFamily: 'Poppins_400Regular' }}>Feed code</Text>
+              <Text style={{ color: Colors.cyan, fontSize: 28, fontFamily: 'Poppins_700Bold', letterSpacing: 5 }}>{code}</Text>
+            </View>
+
+            {/* Action buttons */}
+            <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+              <Pressable
+                onPress={() => { copyToClipboard(code); Haptics.success(); }}
+                style={{ flex: 1, backgroundColor: 'rgba(6,182,212,0.12)', borderRadius: 12, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(6,182,212,0.25)' }}
+              >
+                <Ionicons name="copy-outline" size={16} color={Colors.cyan} />
+                <Text style={{ color: Colors.cyan, fontSize: 13, fontFamily: 'Poppins_600SemiBold' }}>Copy</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => shareText(`Join my ClassChaos feed!\n\nCode: ${code}\n\nDownload ClassChaos and enter this code to join.`)}
+                style={{ flex: 1, backgroundColor: Colors.cyan, borderRadius: 12, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+              >
+                <Ionicons name="share-social-outline" size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 13, fontFamily: 'Poppins_600SemiBold' }}>Share</Text>
+              </Pressable>
+            </View>
+
+            <Pressable onPress={onClose}>
+              <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular' }}>Close</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function FeedInfoScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
   const { token } = useAuthStore();
@@ -31,6 +88,9 @@ export default function FeedInfoScreen() {
   const feed = store.feed as any;
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showQR, setShowQR] = useState(false);
+  const [isPublic, setIsPublic] = useState<boolean>(feed?.is_public ?? false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const fetchMembers = useCallback(async () => {
     if (!token || !code) return;
@@ -47,7 +107,24 @@ export default function FeedInfoScreen() {
     }
   }, [token, code]);
 
-  useEffect(() => { fetchMembers(); }, []);
+  useEffect(() => {
+    fetchMembers().then(() => {
+      const me = members.find((m) => m.id === store.myMemberId);
+      if (me?.is_admin) setIsAdmin(true);
+    });
+    setIsPublic(feed?.is_public ?? false);
+  }, []);
+
+  const togglePublic = async (val: boolean) => {
+    if (!token || !code) return;
+    setIsPublic(val);
+    try {
+      await fetch(`${API_URL}/feed/feeds/${code}/visibility?is_public=${val}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch { setIsPublic(!val); }
+  };
 
   const shareCode = async () => {
     await shareText(`Join my anonymous class feed on ClassChaos!\n\nFeed code: ${code}\n\nDownload the app and use this code to join.`);
@@ -67,6 +144,9 @@ export default function FeedInfoScreen() {
         <Text style={{ color: Colors.text.primary, fontSize: 18, fontFamily: 'Poppins_700Bold', flex: 1 }}>
           Group Info
         </Text>
+        <Pressable onPress={() => setShowQR(true)} style={{ padding: 4 }}>
+          <Ionicons name="qr-code-outline" size={22} color={Colors.cyan} />
+        </Pressable>
       </View>
 
       <FlatList
@@ -85,42 +165,84 @@ export default function FeedInfoScreen() {
                 <Ionicons name="people" size={36} color={Colors.cyan} />
               </View>
               <Text style={{ color: Colors.text.primary, fontSize: 22, fontFamily: 'Poppins_700Bold' }}>
-                {feed?.name ?? feed?.name ?? code}
+                {feed?.name ?? code}
               </Text>
               <Text style={{ color: Colors.text.muted, fontSize: 13, fontFamily: 'Poppins_400Regular' }}>
                 {members.length} members · Messages expire in 24h
               </Text>
             </View>
 
-            {/* Feed code + share */}
-            <Pressable
-              onPress={() => { Haptics.selection(); shareCode(); }}
-              style={{
-                marginHorizontal: 16, marginBottom: 8,
-                backgroundColor: Colors.bg.card,
-                borderRadius: BorderRadius.card,
-                borderWidth: 1, borderColor: 'rgba(6,182,212,0.2)',
-                flexDirection: 'row', alignItems: 'center',
-                padding: 16, gap: 14,
-              }}
-            >
+            {/* Feed code + share + QR */}
+            <View style={{ marginHorizontal: 16, marginBottom: 8, flexDirection: 'row', gap: 8 }}>
+              <Pressable
+                onPress={() => { Haptics.selection(); shareCode(); }}
+                style={{
+                  flex: 1,
+                  backgroundColor: Colors.bg.card,
+                  borderRadius: BorderRadius.card,
+                  borderWidth: 1, borderColor: 'rgba(6,182,212,0.2)',
+                  flexDirection: 'row', alignItems: 'center',
+                  padding: 16, gap: 14,
+                }}
+              >
+                <View style={{
+                  width: 40, height: 40, borderRadius: 20,
+                  backgroundColor: 'rgba(6,182,212,0.12)',
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Ionicons name="link" size={20} color={Colors.cyan} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.text.secondary, fontSize: 11, fontFamily: 'Poppins_400Regular' }}>
+                    Invite code
+                  </Text>
+                  <Text style={{ color: Colors.cyan, fontSize: 18, fontFamily: 'Poppins_700Bold', letterSpacing: 3 }}>
+                    {code}
+                  </Text>
+                </View>
+                <Ionicons name="share-social-outline" size={20} color={Colors.cyan} />
+              </Pressable>
+
+              {/* QR button */}
+              <Pressable
+                onPress={() => { Haptics.light(); setShowQR(true); }}
+                style={{
+                  backgroundColor: Colors.bg.card,
+                  borderRadius: BorderRadius.card,
+                  borderWidth: 1, borderColor: 'rgba(6,182,212,0.2)',
+                  width: 64, alignItems: 'center', justifyContent: 'center', gap: 4,
+                }}
+              >
+                <Ionicons name="qr-code-outline" size={22} color={Colors.cyan} />
+                <Text style={{ color: Colors.cyan, fontSize: 9, fontFamily: 'Poppins_600SemiBold' }}>QR</Text>
+              </Pressable>
+            </View>
+
+            {/* Public toggle (admin only) */}
+            {isAdmin && (
               <View style={{
-                width: 40, height: 40, borderRadius: 20,
-                backgroundColor: 'rgba(6,182,212,0.12)',
-                alignItems: 'center', justifyContent: 'center',
+                marginHorizontal: 16, marginBottom: 8,
+                backgroundColor: Colors.bg.card, borderRadius: BorderRadius.card,
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                flexDirection: 'row', alignItems: 'center', padding: 16, gap: 14,
               }}>
-                <Ionicons name="link" size={20} color={Colors.cyan} />
+                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(16,185,129,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="globe-outline" size={20} color="#10b981" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.text.primary, fontSize: 14, fontFamily: 'Poppins_600SemiBold' }}>Public Feed</Text>
+                  <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_400Regular' }}>
+                    {isPublic ? 'Visible in Discover tab' : 'Invite-only (private)'}
+                  </Text>
+                </View>
+                <Switch
+                  value={isPublic}
+                  onValueChange={togglePublic}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(16,185,129,0.4)' }}
+                  thumbColor={isPublic ? '#10b981' : '#666'}
+                />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: Colors.text.secondary, fontSize: 11, fontFamily: 'Poppins_400Regular' }}>
-                  Invite code
-                </Text>
-                <Text style={{ color: Colors.cyan, fontSize: 18, fontFamily: 'Poppins_700Bold', letterSpacing: 3 }}>
-                  {code}
-                </Text>
-              </View>
-              <Ionicons name="share-social-outline" size={20} color={Colors.cyan} />
-            </Pressable>
+            )}
 
             {/* Privacy notice */}
             <View style={{
@@ -191,6 +313,8 @@ export default function FeedInfoScreen() {
           </View>
         ) : null}
       />
+
+      <QRModal code={code ?? ''} visible={showQR} onClose={() => setShowQR(false)} />
     </SafeAreaView>
   );
 }

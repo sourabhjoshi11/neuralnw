@@ -11,6 +11,8 @@ node_modules/
 dist/
 build/
 web-build/
+uploads/
+*.log
 
 # Python
 __pycache__/

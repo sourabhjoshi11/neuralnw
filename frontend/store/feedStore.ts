@@ -35,6 +35,8 @@ type FeedState = {
   removeOnlineMember: (id: string) => void;
   editMessage: (messageId: string, content: string, editedAt: string) => void;
   updateReactions: (messageId: string, reactions: Record<string, number>) => void;
+  updatePoll: (messageId: string, pollVotes: Record<string, string[]> | null) => void;
+  updateSeenBy: (messageId: string, seenBy: string[]) => void;
   toggleMuteFeed: (feedId: string) => void;
   setLastRead: (feedId: string, messageId: string) => void;
   setMembers: (members: import('@/types').FeedMember[]) => void;
@@ -124,6 +126,20 @@ export const useFeedStore = create<FeedState>()(
         set((state) => ({
           messages: state.messages.map((m) =>
             m.id === messageId ? { ...m, reactions } : m
+          ),
+        })),
+
+      updatePoll: (messageId, pollVotes) =>
+        set((state) => ({
+          messages: state.messages.map((m) =>
+            m.id === messageId ? { ...m, pollVotes } : m
+          ),
+        })),
+
+      updateSeenBy: (messageId, seenBy) =>
+        set((state) => ({
+          messages: state.messages.map((m) =>
+            m.id === messageId ? { ...m, seenBy } : m
           ),
         })),
 

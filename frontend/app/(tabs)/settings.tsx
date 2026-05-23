@@ -1,10 +1,11 @@
+import { useEffect } from 'react';
 import { View, Text, Switch, Pressable, ScrollView, SafeAreaView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, BorderRadius } from '@/constants/theme';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useAuthStore } from '@/store/authStore';
-import { requestNotificationPermission } from '@/utils/notifications';
+import { hasNotificationPermission, requestNotificationPermission } from '@/utils/notifications';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
 
@@ -70,6 +71,16 @@ export default function SettingsScreen() {
   } = useSettingsStore();
   const { clearUser, token } = useAuthStore();
 
+  useEffect(() => {
+    if (!notificationsEnabled) return;
+
+    hasNotificationPermission().then((granted) => {
+      if (!granted) {
+        setNotificationsEnabled(false);
+      }
+    });
+  }, [notificationsEnabled, setNotificationsEnabled]);
+
   const handleNotificationsToggle = async (enabled: boolean) => {
     if (enabled) {
       const granted = await requestNotificationPermission();
@@ -105,6 +116,43 @@ export default function SettingsScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and remove you from all feeds. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Forever',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you absolutely sure?',
+              'All your data will be erased. Type DELETE to confirm.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, Delete My Account',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await fetch(`${API_URL}/auth/account`, {
+                        method: 'DELETE',
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                    } catch { /* ignore */ }
+                    clearUser();
+                    router.replace('/(auth)/landing');
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -200,6 +248,14 @@ export default function SettingsScreen() {
                 icon="log-out"
                 label="Sign Out"
                 right={<Ionicons name="chevron-forward" size={16} color={Colors.text.muted} />}
+              />
+            </Pressable>
+            <Pressable onPress={handleDeleteAccount}>
+              <SettingRow
+                icon="trash-outline"
+                label="Delete Account"
+                sublabel="Permanently erase all data"
+                right={<Ionicons name="chevron-forward" size={16} color="#ef4444" />}
               />
             </Pressable>
           </View>

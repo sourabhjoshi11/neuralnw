@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { View, Text } from 'react-native';
+import { useEffect, useRef, useCallback } from "react";
+import { View, Text, Platform } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -8,10 +8,19 @@ import Animated, {
   withSpring,
   Easing,
   runOnJS,
-} from 'react-native-reanimated';
-import { Audio } from 'expo-av';
-import Svg, { Path, Circle, Text as SvgText, Defs, RadialGradient, Stop, G } from 'react-native-svg';
-import type { AnonPlayer } from '@/types';
+} from "react-native-reanimated";
+import type { AudioPlayer } from "expo-audio";
+import Svg, {
+  Path,
+  Circle,
+  Text as SvgText,
+  Defs,
+  RadialGradient,
+  Stop,
+  G,
+} from "react-native-svg";
+import type { AnonPlayer } from "@/types";
+import { useSettingsStore } from "@/store/settingsStore";
 
 type Props = {
   players: AnonPlayer[];
@@ -26,7 +35,13 @@ function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
-function slicePath(cx: number, cy: number, r: number, startDeg: number, endDeg: number) {
+function slicePath(
+  cx: number,
+  cy: number,
+  r: number,
+  startDeg: number,
+  endDeg: number,
+) {
   const s = polarToCartesian(cx, cy, r, startDeg);
   const e = polarToCartesian(cx, cy, r, endDeg);
   const large = endDeg - startDeg > 180 ? 1 : 0;
@@ -35,21 +50,28 @@ function slicePath(cx: number, cy: number, r: number, startDeg: number, endDeg: 
 
 // Darken a hex color for inner edge effect
 function darkenColor(hex: string, amount = 0.3): string {
-  const num = parseInt(hex.replace('#', ''), 16);
+  const num = parseInt(hex.replace("#", ""), 16);
   const r = Math.max(0, ((num >> 16) & 0xff) * (1 - amount));
   const g = Math.max(0, ((num >> 8) & 0xff) * (1 - amount));
   const b = Math.max(0, (num & 0xff) * (1 - amount));
   return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
 }
 
-export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpinComplete }: Props) {
+export function SpinWheel({
+  players,
+  targetPlayerId,
+  spinning,
+  size = 290,
+  onSpinComplete,
+}: Props) {
   const rotation = useSharedValue(0);
   const glowScale = useSharedValue(1);
   const pointerY = useSharedValue(0);
   const isAnimating = useRef(false);
 
   // Sound refs
-  const tickSoundRef = useRef<Audio.Sound | null>(null);
+  const tickSoundRef = useRef<AudioPlayer | null>(null);
+  const spinEndSoundRef = useRef<AudioPlayer | null>(null);
   const tickTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const wheelStyle = useAnimatedStyle(() => ({
@@ -67,15 +89,30 @@ export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpi
 
   // Load tick sound once
   useEffect(() => {
-    Audio.setAudioModeAsync({ playsInSilentModeIOS: true }).catch(() => {});
-    Audio.Sound.createAsync(
-      require('../../assets/sounds/tick.wav'),
-      { volume: 0.7 },
-    ).then(({ sound }) => {
-      tickSoundRef.current = sound;
-    }).catch(() => {});
+    async function loadSound() {
+      if (Platform.OS === "web") return;
+      try {
+        const { createAudioPlayer, setAudioModeAsync } = await import("expo-audio");
+        await setAudioModeAsync({ playsInSilentMode: true });
+        const player = createAudioPlayer(require("../../assets/sounds/tick.wav"), {
+          keepAudioSessionActive: true,
+        });
+        const endPlayer = createAudioPlayer(require("../../assets/sounds/spin_end.wav"), {
+          keepAudioSessionActive: true,
+        });
+        player.volume = 0.7;
+        endPlayer.volume = 0.85;
+        tickSoundRef.current = player;
+        spinEndSoundRef.current = endPlayer;
+      } catch {
+        // Audio may not be available in this runtime.
+      }
+    }
+
+    loadSound();
     return () => {
-      tickSoundRef.current?.unloadAsync();
+      tickSoundRef.current?.remove();
+      spinEndSoundRef.current?.remove();
     };
   }, []);
 
@@ -86,14 +123,22 @@ export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpi
       withTiming(8, { duration: 80 }),
       withSpring(0, { damping: 4, stiffness: 300, mass: 0.6 }),
     );
+    if (useSettingsStore.getState().soundEnabled) {
+      spinEndSoundRef.current
+        ?.seekTo(0)
+        .then(() => spinEndSoundRef.current?.play())
+        .catch(() => {});
+    }
     onSpinComplete?.();
   }, [onSpinComplete]);
 
   // Play tick sound — called from JS timers during spin
   const playTick = useCallback(() => {
+    if (!useSettingsStore.getState().soundEnabled) return;
     if (!tickSoundRef.current) return;
-    tickSoundRef.current.setPositionAsync(0)
-      .then(() => tickSoundRef.current?.playAsync())
+    tickSoundRef.current
+      .seekTo(0)
+      .then(() => tickSoundRef.current?.play())
       .catch(() => {});
   }, []);
 
@@ -102,7 +147,13 @@ export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpi
     tickTimers.current.forEach(clearTimeout);
     tickTimers.current = [];
 
-    if (!spinning || !targetPlayerId || players.length === 0 || isAnimating.current) return;
+    if (
+      !spinning ||
+      !targetPlayerId ||
+      players.length === 0 ||
+      isAnimating.current
+    )
+      return;
 
     const targetIndex = players.findIndex((p) => p.id === targetPlayerId);
     if (targetIndex < 0) return;
@@ -139,7 +190,11 @@ export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpi
     let interval = START_INTERVAL;
     while (elapsed < TOTAL_MS - 200) {
       const t = elapsed;
-      timers.push(setTimeout(() => { playTick(); }, t));
+      timers.push(
+        setTimeout(() => {
+          playTick();
+        }, t),
+      );
       interval = Math.min(interval * 1.12, END_INTERVAL);
       elapsed += interval;
     }
@@ -150,13 +205,17 @@ export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpi
         duration: 1000,
         easing: Easing.in(Easing.cubic),
       }),
-      withTiming(endAngle, {
-        duration: 3600,
-        easing: Easing.out(Easing.cubic),
-      }, () => {
-        'worklet';
-        runOnJS(onAnimDone)();
-      }),
+      withTiming(
+        endAngle,
+        {
+          duration: 3600,
+          easing: Easing.out(Easing.cubic),
+        },
+        () => {
+          "worklet";
+          runOnJS(onAnimDone)();
+        },
+      ),
     );
   }, [spinning, targetPlayerId]);
 
@@ -168,11 +227,11 @@ export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpi
   const showLabels = sliceAngle >= 20;
 
   const winnerColor = targetPlayerId
-    ? (players.find((p) => p.id === targetPlayerId)?.color ?? '#3b82f6')
-    : '#3b82f6';
+    ? (players.find((p) => p.id === targetPlayerId)?.color ?? "#3b82f6")
+    : "#3b82f6";
 
   return (
-    <View style={{ alignItems: 'center', gap: 0 }}>
+    <View style={{ alignItems: "center", gap: 0 }}>
       {/* Pointer */}
       <Animated.View style={[{ zIndex: 20, marginBottom: -2 }, pointerStyle]}>
         <View
@@ -182,10 +241,10 @@ export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpi
             borderLeftWidth: 11,
             borderRightWidth: 11,
             borderTopWidth: 18,
-            borderLeftColor: 'transparent',
-            borderRightColor: 'transparent',
-            borderTopColor: spinning ? winnerColor : '#f1f5f9',
-            shadowColor: spinning ? winnerColor : '#fff',
+            borderLeftColor: "transparent",
+            borderRightColor: "transparent",
+            borderTopColor: spinning ? winnerColor : "#f1f5f9",
+            shadowColor: spinning ? winnerColor : "#fff",
             shadowOpacity: spinning ? 0.9 : 0.3,
             shadowRadius: 8,
             shadowOffset: { width: 0, height: 0 },
@@ -197,7 +256,7 @@ export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpi
       <Animated.View
         style={[
           {
-            position: 'absolute',
+            position: "absolute",
             top: 16,
             width: size + 20,
             height: size + 20,
@@ -212,14 +271,16 @@ export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpi
         {/* Outer decorative ring */}
         <View
           style={{
-            position: 'absolute',
+            position: "absolute",
             top: 0,
             left: 0,
             width: size,
             height: size,
             borderRadius: size / 2,
             borderWidth: 3,
-            borderColor: spinning ? winnerColor + '88' : 'rgba(255,255,255,0.12)',
+            borderColor: spinning
+              ? winnerColor + "88"
+              : "rgba(255,255,255,0.12)",
           }}
         />
 
@@ -278,8 +339,9 @@ export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpi
                 const label =
                   sliceAngle >= 60
                     ? player.username.slice(0, 7).toUpperCase()
-                    : player.username[0]?.toUpperCase() ?? '?';
-                const fontSize = sliceAngle > 60 ? 13 : sliceAngle > 35 ? 12 : 11;
+                    : (player.username[0]?.toUpperCase() ?? "?");
+                const fontSize =
+                  sliceAngle > 60 ? 13 : sliceAngle > 35 ? 12 : 11;
                 // Push label outward a bit more when showing full name so it's not cramped
                 const labelR = sliceAngle >= 60 ? r * 0.62 : r * 0.65;
                 const { x, y } = polarToCartesian(cx, cy, labelR, midDeg);
@@ -308,24 +370,29 @@ export function SpinWheel({ players, targetPlayerId, spinning, size = 290, onSpi
               cy={cy}
               r={30}
               fill="none"
-              stroke={spinning ? winnerColor : 'rgba(255,255,255,0.15)'}
+              stroke={spinning ? winnerColor : "rgba(255,255,255,0.15)"}
               strokeWidth={1.5}
             />
             {/* Center dot */}
-            <Circle cx={cx} cy={cy} r={5} fill={spinning ? winnerColor : '#475569'} />
+            <Circle
+              cx={cx}
+              cy={cy}
+              r={5}
+              fill={spinning ? winnerColor : "#475569"}
+            />
           </Svg>
         </Animated.View>
 
         {/* Bottle emoji fixed at center */}
         <View
           style={{
-            position: 'absolute',
+            position: "absolute",
             top: cy - 14,
             left: cx - 14,
             width: 28,
             height: 28,
-            alignItems: 'center',
-            justifyContent: 'center',
+            alignItems: "center",
+            justifyContent: "center",
           }}
           pointerEvents="none"
         >

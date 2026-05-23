@@ -7,5 +7,6 @@ venv/
 *.egg-info/
 dist/
 build/
+uploads/
 .mypy_cache/
 .pytest_cache/

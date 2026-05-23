@@ -7,6 +7,9 @@ const WS_URL = process.env.EXPO_PUBLIC_WS_URL ?? 'wss://api.classchaos.app';
 const MAX_RECONNECT_DELAY_MS = 30_000;
 const PING_INTERVAL_MS = 25_000;
 
+// Close codes that mean "don't bother reconnecting"
+const FATAL_CLOSE_CODES = new Set([4001, 4003, 4004, 4005]);
+
 type UseWebSocketOptions = {
   roomCode: string;
   playerId: string;
@@ -14,6 +17,8 @@ type UseWebSocketOptions = {
   onMessage: (msg: WSMessage) => void;
   onOpen?: () => void;
   onClose?: () => void;
+  /** Called when the server closes with a fatal code (bad token / room ended / not a member) */
+  onFatalError?: (code: number, reason: string) => void;
 };
 
 export function useWebSocket({
@@ -23,6 +28,7 @@ export function useWebSocket({
   onMessage,
   onOpen,
   onClose,
+  onFatalError,
 }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,11 +75,19 @@ export function useWebSocket({
       }, PING_INTERVAL_MS);
     };
 
+    // Track the last error message received before close
+    let lastErrorPayload: { code: number; reason: string } | null = null;
+
     ws.onmessage = (event) => {
       if (!mountedRef.current) return;
       try {
         const msg = JSON.parse(event.data as string) as WSMessage;
         if (msg.type === 'pong') return;
+        // Capture server-sent error payloads so onclose can use them
+        if (msg.type === 'error' && (msg as any).code) {
+          lastErrorPayload = { code: (msg as any).code, reason: (msg as any).reason ?? 'unknown' };
+          return;
+        }
         onMessage(msg);
       } catch {
         // malformed message — ignore
@@ -84,11 +98,21 @@ export function useWebSocket({
       // onclose fires after onerror, handle reconnect there
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       if (!mountedRef.current) return;
       clearTimers();
       setConnected(false);
       onClose?.();
+
+      // If server sent a fatal close code, stop reconnecting
+      const closeCode = event.code;
+      const isFatal = FATAL_CLOSE_CODES.has(closeCode) || (lastErrorPayload && FATAL_CLOSE_CODES.has(lastErrorPayload.code));
+      if (isFatal) {
+        const errorCode = lastErrorPayload?.code ?? closeCode;
+        const errorReason = lastErrorPayload?.reason ?? 'connection_rejected';
+        onFatalError?.(errorCode, errorReason);
+        return;
+      }
 
       if (mountedRef.current) {
         setReconnecting(true);

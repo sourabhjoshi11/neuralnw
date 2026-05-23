@@ -20,6 +20,7 @@ class Feed(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     member_count: Mapped[int] = mapped_column(Integer, default=1)
     pinned_message_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -47,6 +48,11 @@ class FeedMessage(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     reply_to_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("feed_messages.id"), nullable=True)
     reactions: Mapped[dict] = mapped_column(JSON, default=dict)
+    msg_type: Mapped[str] = mapped_column(String(16), default='text', nullable=False)
+    poll_options: Mapped[list | None] = mapped_column(JSON, nullable=True)   # ["opt1", "opt2", ...]
+    poll_votes: Mapped[dict | None] = mapped_column(JSON, nullable=True)     # {"0": [member_id,...], "1": [...]}
+    media_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    seen_by: Mapped[list] = mapped_column(JSON, default=list)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

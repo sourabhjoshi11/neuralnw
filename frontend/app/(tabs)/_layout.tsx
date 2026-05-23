@@ -1,15 +1,19 @@
-import { Redirect, Tabs } from 'expo-router';
-import { Pressable, View, Text } from 'react-native';
+import React, { useEffect, memo, useCallback } from "react";
+import { router, Tabs } from "expo-router";
+
+import { Pressable, View, Text, StyleSheet } from "react-native";
+
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-} from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native-reanimated";
 
-import { useAuthStore } from '@/store/authStore';
-import { Colors, SpringConfig } from '@/constants/theme';
-import { Haptics, shareText, copyToClipboard } from '@/utils/compat';
+import { Ionicons } from "@expo/vector-icons";
+
+import { useAuthStore } from "@/store/authStore";
+import { Colors, SpringConfig } from "@/constants/theme";
+import { Haptics } from "@/utils/compat";
 
 type TabIconProps = {
   name: keyof typeof Ionicons.glyphMap;
@@ -17,82 +21,103 @@ type TabIconProps = {
   label: string;
 };
 
-function TabIcon({ name, focused, label }: TabIconProps) {
+const TabIcon = memo(function TabIcon({ name, focused, label }: TabIconProps) {
   const scale = useSharedValue(1);
+
   const indicatorOpacity = useSharedValue(focused ? 1 : 0);
 
-  const scaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const dotStyle = useAnimatedStyle(() => ({ opacity: indicatorOpacity.value }));
+  // Run animations only when focus changes
+  useEffect(() => {
+    if (focused) {
+      scale.value = withSpring(1.15, SpringConfig.snappy, () => {
+        scale.value = withSpring(1, SpringConfig.default);
+      });
 
-  // Bounce on focus
-  if (focused) {
-    scale.value = withSpring(1.15, SpringConfig.snappy, () => {
-      scale.value = withSpring(1, SpringConfig.default);
-    });
-    indicatorOpacity.value = withSpring(1, SpringConfig.gentle);
-  } else {
-    indicatorOpacity.value = withSpring(0, SpringConfig.gentle);
-  }
+      indicatorOpacity.value = withSpring(1, SpringConfig.gentle);
+    } else {
+      indicatorOpacity.value = withSpring(0, SpringConfig.gentle);
+    }
+  }, [focused]);
+
+  const scaleStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        scale: scale.value,
+      },
+    ],
+  }));
+
+  const dotStyle = useAnimatedStyle(() => ({
+    opacity: indicatorOpacity.value,
+  }));
 
   return (
-    <View style={{ alignItems: 'center', gap: 3 }}>
+    <View style={styles.tabContainer}>
       <Animated.View style={scaleStyle}>
-        <Ionicons name={name} size={22} color={focused ? Colors.blue : Colors.text.muted} />
+        <Ionicons
+          name={name}
+          size={22}
+          color={focused ? Colors.blue : Colors.text.muted}
+        />
       </Animated.View>
+
       <Text
-        style={{
-          fontSize: 10,
-          fontFamily: 'Poppins_500Medium',
-          color: focused ? Colors.blue : Colors.text.muted,
-        }}
+        numberOfLines={1}
+        style={[
+          styles.label,
+          {
+            color: focused ? Colors.blue : Colors.text.muted,
+          },
+        ]}
       >
         {label}
       </Text>
-      <Animated.View
-        style={[
-          {
-            width: 4,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: Colors.blue,
-            marginTop: 1,
-          },
-          dotStyle,
-        ]}
-      />
+
+      <Animated.View style={[styles.dot, dotStyle]} />
     </View>
   );
-}
+});
 
 export default function TabsLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace("/(auth)/landing");
+    }
+  }, [isAuthenticated]);
+
+  const renderTabBarButton = useCallback((props: any) => {
+    const { ref: _ref, onPress, style, ...pressableProps } = props;
+
+    return (
+      <Pressable
+        {...pressableProps}
+        style={[style, styles.tabButton]}
+        onPress={(e) => {
+          Haptics.selection();
+          onPress?.(e);
+        }}
+      />
+    );
+  }, []);
+
   if (!isAuthenticated) {
-    return <Redirect href="/(auth)/landing" />;
+    return null;
   }
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#1a2235',
-          borderTopWidth: 1,
-          borderTopColor: 'rgba(255,255,255,0.05)',
-          height: 68,
-          paddingBottom: 10,
-          paddingTop: 8,
-        },
+
+        tabBarStyle: styles.tabBar,
+
         tabBarShowLabel: false,
-        tabBarButton: (props) => (
-          <Pressable
-            {...props}
-            onPress={(e) => {
-              Haptics.selection();
-              props.onPress?.(e);
-            }}
-          />
-        ),
+
+        tabBarButton: renderTabBarButton,
+
+        tabBarItemStyle: styles.tabItem,
       }}
     >
       <Tabs.Screen
@@ -103,6 +128,7 @@ export default function TabsLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
         name="games"
         options={{
@@ -111,6 +137,7 @@ export default function TabsLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
         name="feed"
         options={{
@@ -119,14 +146,61 @@ export default function TabsLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
         name="settings"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="settings" focused={focused} label="Settings" />
+            <TabIcon name="settings-outline" focused={focused} label="Set" />
           ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    width: "100%",
+  },
+
+  tabItem: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  tabButton: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  label: {
+    fontSize: 10,
+    fontFamily: "Poppins_500Medium",
+    textAlign: "center",
+    includeFontPadding: false,
+  },
+
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 1,
+    backgroundColor: Colors.blue,
+  },
+
+  tabBar: {
+    backgroundColor: "#1a2235",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.05)",
+    height: 68,
+    paddingBottom: 10,
+    paddingTop: 8,
+    paddingHorizontal: 4,
+  },
+});

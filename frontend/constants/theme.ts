@@ -1,4 +1,6 @@
-export const Colors = {
+export type ThemeName = 'dark' | 'light';
+
+const darkColors = {
   bg: {
     primary: '#0a0e1a',
     secondary: '#111827',
@@ -17,7 +19,55 @@ export const Colors = {
   green: '#10b981',
   yellow: '#f59e0b',
   red: '#ef4444',
-} as const;
+};
+
+const lightColors: typeof darkColors = {
+  bg: {
+    primary: '#f8fafc',
+    secondary: '#e2e8f0',
+    card: '#ffffff',
+  },
+  text: {
+    primary: '#0f172a',
+    secondary: '#475569',
+    muted: '#64748b',
+  },
+  border: 'rgba(15,23,42,0.1)',
+  blue: '#2563eb',
+  cyan: '#0891b2',
+  purple: '#7c3aed',
+  pink: '#db2777',
+  green: '#059669',
+  yellow: '#d97706',
+  red: '#dc2626',
+};
+
+export const Colors = {
+  bg: { ...darkColors.bg },
+  text: { ...darkColors.text },
+  border: darkColors.border,
+  blue: darkColors.blue,
+  cyan: darkColors.cyan,
+  purple: darkColors.purple,
+  pink: darkColors.pink,
+  green: darkColors.green,
+  yellow: darkColors.yellow,
+  red: darkColors.red,
+};
+
+export function applyTheme(theme: ThemeName) {
+  const next = theme === 'light' ? lightColors : darkColors;
+  Object.assign(Colors.bg, next.bg);
+  Object.assign(Colors.text, next.text);
+  Colors.border = next.border;
+  Colors.blue = next.blue;
+  Colors.cyan = next.cyan;
+  Colors.purple = next.purple;
+  Colors.pink = next.pink;
+  Colors.green = next.green;
+  Colors.yellow = next.yellow;
+  Colors.red = next.red;
+}
 
 export const WheelColors = [
   '#3b82f6',

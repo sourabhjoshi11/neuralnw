@@ -149,3 +149,28 @@ async def logout(
     user: User = Depends(get_current_user),
 ):
     _revoke(credentials.credentials)
+
+
+# ─── Delete Account (GDPR) ───────────────────────────────────────────────────
+
+@router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete account and all associated data."""
+    from sqlalchemy import delete as sql_delete
+    from app.models.feed import FeedMember, FeedMessage
+
+    # Soft-delete: anonymise messages (preserve feed integrity)
+    await db.execute(
+        sql_delete(FeedMember).where(FeedMember.user_id == user.id)
+    )
+
+    # Delete the user record
+    await db.delete(user)
+    await db.commit()
+
+    # Revoke token
+    _revoke(credentials.credentials)
