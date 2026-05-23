@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: classchaos-api
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerCommand: sh -c "uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "43200"
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false

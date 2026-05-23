@@ -151,7 +151,7 @@ export default function TabsLayout() {
         name="settings"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="settings-outline" focused={focused} label="Set" />
+            <TabIcon name="settings-outline" focused={focused} label="Settings" />
           ),
         }}
       />
