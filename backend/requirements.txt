@@ -10,3 +10,4 @@ httpx==0.24.1
 slowapi==0.1.9
 alembic==1.11.1
 websockets==11.0.3
+openai>=1.0.0
