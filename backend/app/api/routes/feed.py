@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect, status
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,7 +33,7 @@ class CreateFeedRequest(BaseModel):
     name: str
     is_public: bool = False
 
-    @field_validator("name")
+    @validator("name")
     @classmethod
     def validate_name(cls, v: str) -> str:
         v = v.strip()
@@ -71,7 +71,7 @@ class PostMessageRequest(BaseModel):
     msg_type: str = "text"
     media_url: str | None = None
 
-    @field_validator("content")
+    @validator("content")
     @classmethod
     def validate_content(cls, v: str) -> str:
         v = v.strip()
@@ -79,7 +79,7 @@ class PostMessageRequest(BaseModel):
             raise ValueError("Message must be 1-1000 characters")
         return v
 
-    @field_validator("msg_type")
+    @validator("msg_type")
     @classmethod
     def validate_msg_type(cls, v: str) -> str:
         if v not in {"text", "voice", "image"}:
@@ -109,7 +109,7 @@ class FeedMessageOut(BaseModel):
 class EditMessageRequest(BaseModel):
     content: str
 
-    @field_validator("content")
+    @validator("content")
     @classmethod
     def validate_content(cls, v: str) -> str:
         v = v.strip()
@@ -122,7 +122,7 @@ class CreatePollRequest(BaseModel):
     question: str
     options: list[str]
 
-    @field_validator("question")
+    @validator("question")
     @classmethod
     def validate_question(cls, v: str) -> str:
         v = v.strip()
@@ -130,7 +130,7 @@ class CreatePollRequest(BaseModel):
             raise ValueError("Question must be 3-200 characters")
         return v
 
-    @field_validator("options")
+    @validator("options")
     @classmethod
     def validate_options(cls, v: list[str]) -> list[str]:
         v = [o.strip() for o in v]
@@ -148,7 +148,7 @@ class PollVoteRequest(BaseModel):
 class ReactRequest(BaseModel):
     emoji: str
 
-    @field_validator("emoji")
+    @validator("emoji")
     @classmethod
     def validate_emoji(cls, v: str) -> str:
         if len(v) > 8:

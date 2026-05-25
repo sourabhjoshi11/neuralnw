@@ -1,13 +1,13 @@
 import re
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, validator
 
 
 class SendOtpRequest(BaseModel):
     phone: str
 
-    @field_validator("phone")
+    @validator("phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
         cleaned = v.strip().replace(" ", "")
@@ -20,12 +20,12 @@ class VerifyOtpRequest(BaseModel):
     phone: str
     otp: str
 
-    @field_validator("phone")
+    @validator("phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
         return v.strip().replace(" ", "")
 
-    @field_validator("otp")
+    @validator("otp")
     @classmethod
     def validate_otp(cls, v: str) -> str:
         if not re.match(r"^\d{6}$", v.strip()):
@@ -36,7 +36,7 @@ class VerifyOtpRequest(BaseModel):
 class CompleteSignupRequest(BaseModel):
     name: str
 
-    @field_validator("name")
+    @validator("name")
     @classmethod
     def validate_name(cls, v: str) -> str:
         stripped = v.strip()

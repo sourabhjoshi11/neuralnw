@@ -1,11 +1,11 @@
 from datetime import datetime
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, validator
 
 
 class CreateRoomRequest(BaseModel):
     duration_minutes: int
 
-    @field_validator("duration_minutes")
+    @validator("duration_minutes")
     @classmethod
     def validate_duration(cls, v: int) -> int:
         if not (5 <= v <= 120):
@@ -16,7 +16,7 @@ class CreateRoomRequest(BaseModel):
 class ChoiceRequest(BaseModel):
     choice: str
 
-    @field_validator("choice")
+    @validator("choice")
     @classmethod
     def validate_choice(cls, v: str) -> str:
         if v not in ("truth", "dare"):
@@ -27,7 +27,7 @@ class ChoiceRequest(BaseModel):
 class AnswerRequest(BaseModel):
     answer: str
 
-    @field_validator("answer")
+    @validator("answer")
     @classmethod
     def validate_answer(cls, v: str) -> str:
         v = v.strip()
@@ -41,7 +41,7 @@ class AnswerRequest(BaseModel):
 class VoteRequest(BaseModel):
     value: str
 
-    @field_validator("value")
+    @validator("value")
     @classmethod
     def validate_value(cls, v: str) -> str:
         if v not in ("yes", "no"):
@@ -52,7 +52,7 @@ class VoteRequest(BaseModel):
 class PunishmentVoteRequest(BaseModel):
     value: str
 
-    @field_validator("value")
+    @validator("value")
     @classmethod
     def validate_value(cls, v: str) -> str:
         if v not in ("a", "b"):
