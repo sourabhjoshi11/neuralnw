@@ -25,6 +25,7 @@ type GameState = {
   customVote: { yes: number; no: number; total: number; threshold: number };
   suggesterPlayerId: string | null;
   isSuggestionSubmitted: boolean;
+  spinHistory: string[]; // Player IDs of recent spins
 
   setRoom: (room: Room) => void;
   setPlayers: (players: AnonPlayer[]) => void;
@@ -77,6 +78,7 @@ const initialState = {
   customVote: { yes: 0, no: 0, total: 0, threshold: 1 },
   suggesterPlayerId: null as string | null,
   isSuggestionSubmitted: false,
+  spinHistory: [] as string[],
 };
 
 export const useGameStore = create<GameState>()(
@@ -113,7 +115,12 @@ export const useGameStore = create<GameState>()(
 
       setPhase: (phase, endsAt) => set({ phase, phaseEndsAt: endsAt ?? null }),
 
-      setCurrentTurn: (currentTurnPlayerId) => set({ currentTurnPlayerId }),
+      setCurrentTurn: (currentTurnPlayerId) => set((state) => ({
+        currentTurnPlayerId,
+        spinHistory: currentTurnPlayerId 
+          ? [...state.spinHistory, currentTurnPlayerId].slice(-10) // Keep last 10
+          : state.spinHistory,
+      })),
 
       setCurrentRoundId: (currentRoundId) => set({ currentRoundId }),
 

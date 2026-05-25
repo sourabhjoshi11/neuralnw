@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import Animated, {

@@ -113,6 +113,34 @@ async def cs_ws_handler(ws: WebSocket, room_code: str, db: AsyncSession) -> None
                     "data": {"playerId": player.id, "username": player.username},
                 }, exclude=player.id)
 
+            elif msg_type == "guess_preview":
+                await db.refresh(room)
+                await db.refresh(player)
+                if room.phase != "guessing" or player.role != "mantri":
+                    continue
+
+                guess_chor_id = msg.get("guessChorId")
+                guess_sipahi_id = msg.get("guessSipahiId")
+                round_r = await db.execute(
+                    select(CSRound).where(CSRound.room_id == room.id, CSRound.round_number == room.current_round)
+                )
+                round_ = round_r.scalar_one_or_none()
+                valid_ids = {round_.chor_id, round_.sipahi_id} if round_ else set()
+
+                if guess_chor_id is not None and guess_chor_id not in valid_ids:
+                    guess_chor_id = None
+                if guess_sipahi_id is not None and guess_sipahi_id not in valid_ids:
+                    guess_sipahi_id = None
+
+                await cs_manager.broadcast(room_code, {
+                    "type": "guess_preview",
+                    "data": {
+                        "mantriId": player.id,
+                        "guessChorId": guess_chor_id,
+                        "guessSipahiId": guess_sipahi_id,
+                    },
+                })
+
             elif msg_type == "reaction":
                 emoji = str(msg.get("emoji", ""))[:2]
                 if emoji:

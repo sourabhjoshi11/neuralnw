@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, SafeAreaView, FlatList, ActivityIndicator, Alert, Modal, Image, Switch } from 'react-native';
+import { View, Text, Pressable, FlatList, ActivityIndicator, Alert, Modal, Image, Switch } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Haptics, shareText, copyToClipboard } from '@/utils/compat';

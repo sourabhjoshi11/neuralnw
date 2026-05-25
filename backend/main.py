@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+import logging
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +20,17 @@ from app.core.config import settings
 from app.db.base import AsyncSessionLocal, engine, Base
 import app.models  # noqa: F401 - ensures all models are registered with SQLAlchemy
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('app.log')
+    ]
+)
+logger = logging.getLogger(__name__)
+
 limiter = Limiter(key_func=get_remote_address)
 HTTP_DEBUG_LOG = Path("http_debug.log")
 
@@ -37,9 +49,9 @@ async def lifespan(app: FastAPI):
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        print("Database connected and tables ready")
+        logger.info("Database connected and tables ready")
     except Exception as e:
-        print(f"Database connection failed at startup: {e}")
+        logger.error(f"Database connection failed at startup: {e}")
         print("Server will start anyway")
     yield
     await engine.dispose()
@@ -59,7 +71,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
+    import traceback
+    error_trace = traceback.format_exc()
+    logger.error(f"Unhandled error for {request.method} {request.url.path}: {exc}")
+    logger.error(f"Traceback:\n{error_trace}")
     print(f"Unhandled error for {request.method} {request.url.path}: {exc}")
+    print(f"Traceback:\n{error_trace}")
     origin = request.headers.get("origin")
     headers = {}
     if origin:

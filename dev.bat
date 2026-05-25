@@ -40,7 +40,7 @@ start "ClassChaos BACKEND" cmd /k "cd /d "%ROOT%backend" && call venv\Scripts\ac
 timeout /t 2 /nobreak >nul
 
 echo  [2/2] Launching Expo frontend (LAN + Fast Refresh enabled)...
-start "ClassChaos FRONTEND" cmd /k "cd /d "%ROOT%frontend" && set EXPO_USE_FAST_REFRESH=true && npx expo start --lan"
+start "ClassChaos FRONTEND" cmd /k "cd /d "%ROOT%frontend" && set EXPO_USE_FAST_REFRESH=true && npx expo start --lan --clear"
 
 echo.
 echo  Done! Check the two new terminal windows.

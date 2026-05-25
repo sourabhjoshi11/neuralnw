@@ -5,7 +5,6 @@ import {
   TextInput,
   ScrollView,
   Pressable,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
@@ -17,9 +16,12 @@ import {
   Animated as RNAnimated,
   Image,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import Animated, {
   FadeIn,
+  SlideInUp,
+  ZoomIn,
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
@@ -32,16 +34,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { Haptics, copyToClipboard } from "@/utils/compat";
 import { apiFetch } from "@/utils/apiFetch";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import {
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  useAudioPlayer,
-  useAudioPlayerStatus,
-  useAudioRecorder,
-} from "expo-audio";
-import type { AudioRecorder } from "expo-audio";
+import { Audio } from 'expo-av';
+import type { Recording, Sound } from 'expo-av/build/Audio';
 import { useLinkPreview } from "@/hooks/useLinkPreview";
+import { TypingIndicator } from "@/components/feed/TypingIndicator";
+import { VoiceBubble } from "@/components/feed/VoiceBubble";
+import { VoicePreviewModal } from "@/components/feed/VoicePreviewModal";
+import { MediaGalleryModal } from "@/components/feed/MediaGalleryModal";
+import { ForwardModal } from "@/components/feed/ForwardModal";
+import { cacheMessages, getCachedMessages } from "@/utils/messageCache";
 
 import { Platform as RNPlatform } from "react-native";
 // expo-screen-capture not available on web
@@ -195,178 +196,9 @@ function mapMessage(m: Record<string, unknown>): FeedMessage {
 
 const REACT_EMOJIS = ["😂", "🔥", "💀", "❤️", "😱", "👀"];
 
-// ─── TypingIndicator ─────────────────────────────────────────────────────────
-
-function TypingDot({ delay }: { delay: number }) {
-  const y = useSharedValue(0);
-  useEffect(() => {
-    y.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(-5, { duration: 300 }),
-          withTiming(0, { duration: 300 }),
-        ),
-        -1,
-        false,
-      ),
-    );
-  }, []);
-  const style = useAnimatedStyle(() => ({
-    transform: [{ translateY: y.value }],
-  }));
-  return (
-    <Animated.View
-      style={[
-        {
-          width: 7,
-          height: 7,
-          borderRadius: 4,
-          backgroundColor: Colors.text.muted,
-        },
-        style,
-      ]}
-    />
-  );
-}
-
-function TypingIndicator({
-  users,
-}: {
-  users: { id: string; username: string }[];
-}) {
-  const label =
-    users.length === 1
-      ? `${users[0].username || "Someone"} is typing`
-      : `${users.length} people are typing`;
-  return (
-    <Animated.View
-      entering={FadeIn.duration(200)}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 4,
-          backgroundColor: Colors.bg.card,
-          borderRadius: 14,
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-          borderWidth: 1,
-          borderColor: "rgba(255,255,255,0.06)",
-        }}
-      >
-        <TypingDot delay={0} />
-        <TypingDot delay={150} />
-        <TypingDot delay={300} />
-      </View>
-      <Text
-        style={{
-          color: Colors.text.muted,
-          fontSize: 12,
-          fontFamily: "Poppins_400Regular",
-        }}
-      >
-        {label}
-      </Text>
-    </Animated.View>
-  );
-}
-
 // ─── MessageBubble ────────────────────────────────────────────────────────────
 
 // ─── VoiceBubble ─────────────────────────────────────────────────────────────
-function VoiceBubble({ url, color }: { url: string; color: string }) {
-  const player = useAudioPlayer({ uri: url }, { updateInterval: 250 });
-  const status = useAudioPlayerStatus(player);
-
-  const togglePlay = async () => {
-    if (status.playing) {
-      player.pause();
-      return;
-    }
-    if (status.didJustFinish) {
-      await player.seekTo(0);
-    }
-    player.play();
-  };
-
-  const fmt = (ms: number) => {
-    const s = Math.floor(ms / 1000);
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-  };
-
-  const position = Math.round(status.currentTime * 1000);
-  const duration = Math.round(status.duration * 1000);
-  const pct = duration > 0 ? position / duration : 0;
-
-  return (
-    <Pressable
-      onPress={togglePlay}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-        paddingVertical: 4,
-        minWidth: 180,
-      }}
-    >
-      <View
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          backgroundColor: color + "22",
-          borderWidth: 1.5,
-          borderColor: color,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Ionicons
-          name={status.playing ? "pause" : "play"}
-          size={16}
-          color={color}
-        />
-      </View>
-      <View style={{ flex: 1, gap: 4 }}>
-        <View
-          style={{
-            height: 3,
-            backgroundColor: "rgba(255,255,255,0.1)",
-            borderRadius: 2,
-            overflow: "hidden",
-          }}
-        >
-          <View
-            style={{
-              width: `${pct * 100}%`,
-              height: "100%",
-              backgroundColor: color,
-              borderRadius: 2,
-            }}
-          />
-        </View>
-        <Text
-          style={{
-            color: Colors.text.muted,
-            fontSize: 10,
-            fontFamily: "Poppins_400Regular",
-          }}
-        >
-          {fmt(position)} / {fmt(duration)}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
 
 // ─── LinkPreviewCard ─────────────────────────────────────────────────────────
 function LinkPreviewCard({ text }: { text: string }) {
@@ -593,6 +425,7 @@ function MessageBubble({
   onReact,
   onPickEmoji,
   onAvatarPress,
+  searchQuery,
 }: {
   message: FeedMessage;
   isMe: boolean;
@@ -602,6 +435,7 @@ function MessageBubble({
   onReact: (msgId: string, emoji: string) => void;
   onPickEmoji: (msgId: string) => void;
   onAvatarPress?: () => void;
+  searchQuery?: string;
 }) {
   const color = colorForSender(message.senderId);
   const displayName = message.username || `anon·${message.senderId.slice(-4)}`;
@@ -609,6 +443,26 @@ function MessageBubble({
   const hasReactions = Object.keys(message.reactions ?? {}).some(
     (k) => (message.reactions ?? {})[k] > 0,
   );
+
+  // Highlight search matches
+  const renderContent = (content: string) => {
+    if (!searchQuery?.trim()) {
+      return <Text style={{ color: isMe ? Colors.text.primary : Colors.text.primary, fontSize: 14, fontFamily: "Poppins_400Regular" }}>{content}</Text>;
+    }
+    const query = searchQuery.trim().toLowerCase();
+    const parts = content.split(new RegExp(`(${query})`, 'gi'));
+    return (
+      <Text style={{ color: isMe ? Colors.text.primary : Colors.text.primary, fontSize: 14, fontFamily: "Poppins_400Regular" }}>
+        {parts.map((part, i) => 
+          part.toLowerCase() === query ? (
+            <Text key={i} style={{ backgroundColor: '#fbbf24', color: '#000' }}>{part}</Text>
+          ) : (
+            part
+          )
+        )}
+      </Text>
+    );
+  };
 
   // Swipe-to-reply gesture
   const swipeX = useRef(new RNAnimated.Value(0)).current;
@@ -762,16 +616,12 @@ function MessageBubble({
                     </Text>
                   </View>
                 )}
-                <Text
-                  style={{
-                    color: Colors.text.primary,
-                    fontSize: 14,
-                    fontFamily: "Poppins_400Regular",
-                    lineHeight: 20,
-                  }}
-                >
-                  {message.content}
-                </Text>
+                {renderContent(message.content)}
+                {message.editedAt && (
+                  <Text style={{ color: Colors.text.muted, fontSize: 9, fontFamily: "Poppins_400Regular", marginTop: 2 }}>
+                    (edited)
+                  </Text>
+                )}
               </LinearGradient>
             ) : (
               <View
@@ -835,16 +685,12 @@ function MessageBubble({
                   </Pressable>
                 ) : (
                   <>
-                    <Text
-                      style={{
-                        color: Colors.text.primary,
-                        fontSize: 14,
-                        fontFamily: "Poppins_400Regular",
-                        lineHeight: 20,
-                      }}
-                    >
-                      {message.content}
-                    </Text>
+                    {renderContent(message.content)}
+                    {message.editedAt && (
+                      <Text style={{ color: Colors.text.muted, fontSize: 9, fontFamily: "Poppins_400Regular", marginTop: 2 }}>
+                        (edited)
+                      </Text>
+                    )}
                     <LinkPreviewCard text={message.content} />
                   </>
                 )}
@@ -974,11 +820,15 @@ function MessageBubble({
 function MemberInfoSheet({
   member,
   isOnline,
+  isAdmin,
   onClose,
+  onKick,
 }: {
   member: FeedMember | null;
   isOnline: boolean;
+  isAdmin: boolean;
   onClose: () => void;
+  onKick?: (memberId: string) => void;
 }) {
   if (!member) return null;
   const color = colorForSender(member.id);
@@ -1129,6 +979,49 @@ function MemberInfoSheet({
                   </Text>
                 </View>
               </View>
+              
+              {/* Admin controls */}
+              {isAdmin && !member.isAdmin && onKick && (
+                <Pressable
+                  onPress={() => {
+                    Alert.alert(
+                      "Remove member?",
+                      `Remove ${member.username} from this feed?`,
+                      [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                          text: "Remove",
+                          style: "destructive",
+                          onPress: () => {
+                            onKick(member.id);
+                            onClose();
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                  style={{
+                    marginTop: 20,
+                    backgroundColor: "rgba(239,68,68,0.1)",
+                    borderRadius: 12,
+                    paddingVertical: 12,
+                    paddingHorizontal: 20,
+                    borderWidth: 1,
+                    borderColor: "rgba(239,68,68,0.3)",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#ef4444",
+                      fontSize: 14,
+                      fontFamily: "Poppins_600SemiBold",
+                      textAlign: "center",
+                    }}
+                  >
+                    Remove from Feed
+                  </Text>
+                </Pressable>
+              )}
             </View>
           </View>
         </Pressable>
@@ -1340,7 +1233,7 @@ export default function FeedRoomScreen() {
   const [showPollModal, setShowPollModal] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const recordingRef = useRef<AudioRecorder | null>(null);
+  const recordingRef = useRef<Recording | null>(null);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [forwardMsg, setForwardMsg] = useState<FeedMessage | null>(null);
   const [myFeeds, setMyFeeds] = useState<
@@ -1358,6 +1251,11 @@ export default function FeedRoomScreen() {
   const [memberSheet, setMemberSheet] = useState<FeedMember | null>(null);
   // @mention autocomplete
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  // Upload progress
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [voicePreview, setVoicePreview] = useState<string | null>(null);
+  const [showMediaGallery, setShowMediaGallery] = useState(false);
   const inputRef = useRef<any>(null);
   const scrollRef = useRef<ScrollView>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -1378,7 +1276,6 @@ export default function FeedRoomScreen() {
   const typingClearTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   const handleForward = async (targetCode: string) => {
     if (!forwardMsg || !token) return;
@@ -1419,7 +1316,7 @@ export default function FeedRoomScreen() {
 
   const startRecording = async () => {
     try {
-      const { status } = await requestRecordingPermissionsAsync();
+      const { status } = await Audio.requestPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
           "Permission needed",
@@ -1427,13 +1324,14 @@ export default function FeedRoomScreen() {
         );
         return;
       }
-      await setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: true,
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
       });
-      await audioRecorder.prepareToRecordAsync();
-      audioRecorder.record();
-      recordingRef.current = audioRecorder;
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      recordingRef.current = recording;
       setIsRecording(true);
       setRecordingDuration(0);
       recordTimerRef.current = setInterval(
@@ -1451,31 +1349,39 @@ export default function FeedRoomScreen() {
     setIsRecording(false);
     setRecordingDuration(0);
     try {
-      await recordingRef.current.stop();
-      await setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
+      await recordingRef.current.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
       });
-      const uri = recordingRef.current.uri;
+      const uri = recordingRef.current.getURI();
       recordingRef.current = null;
       if (!uri) return;
-      const formData = new FormData();
-      if (Platform.OS === "web") {
-        // Browser needs a real Blob — fetch the blob: URL then append
-        const blob = await fetch(uri).then((r) => r.blob());
-        formData.append(
-          "file",
-          blob,
-          blob.type.includes("webm") ? "voice.webm" : "voice.m4a",
-        );
-      } else {
-        formData.append("file", {
-          uri,
-          name: "voice.m4a",
-          type: "audio/m4a",
-        } as any);
-      }
-      setSending(true);
+      // Show preview instead of sending immediately
+      setVoicePreview(uri);
+    } catch {
+      Alert.alert("Error", "Could not save recording.");
+    }
+  };
+
+  const sendVoiceMessage = async (uri: string) => {
+    const formData = new FormData();
+    if (Platform.OS === "web") {
+      const blob = await fetch(uri).then((r) => r.blob());
+      formData.append(
+        "file",
+        blob,
+        blob.type.includes("webm") ? "voice.webm" : "voice.m4a",
+      );
+    } else {
+      formData.append("file", {
+        uri,
+        name: "voice.m4a",
+        type: "audio/m4a",
+      } as any);
+    }
+    setSending(true);
+    try {
       const uploadRes = await apiFetch(
         `${API_URL}/feed/feeds/${code}/upload-image`,
         {
@@ -1515,6 +1421,7 @@ export default function FeedRoomScreen() {
       Alert.alert("Error", "Could not send voice message.");
     } finally {
       setSending(false);
+      setVoicePreview(null);
     }
   };
 
@@ -1522,10 +1429,10 @@ export default function FeedRoomScreen() {
     if (!recordingRef.current) return;
     if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     try {
-      await recordingRef.current.stop();
-      await setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
+      await recordingRef.current.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
       });
     } catch {
       /* ignore */
@@ -1541,36 +1448,44 @@ export default function FeedRoomScreen() {
       ImagePicker = await import("expo-image-picker");
     } catch {
       Alert.alert(
-        "Image picker unavailable",
+        "Media picker unavailable",
         "Rebuild the development app after installing expo-image-picker.",
       );
       return;
     }
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Allow photo access to send images.");
+      Alert.alert("Permission needed", "Allow media access to send files.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"] as any,
+      mediaTypes: ["images", "videos"] as any,
       quality: 0.7,
       allowsEditing: false,
+      videoMaxDuration: 60,
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
+    const isVideo = asset.type === "video" || asset.mimeType?.startsWith("video/");
     const formData = new FormData();
     if (Platform.OS === "web") {
-      // Browser needs a real Blob — fetch the blob:/data: URI then append
       const blob = await fetch(asset.uri).then((r) => r.blob());
-      formData.append("file", blob, asset.fileName || "image.jpg");
+      formData.append("file", blob, asset.fileName || (isVideo ? "video.mp4" : "image.jpg"));
     } else {
       formData.append("file", {
         uri: asset.uri,
-        name: asset.fileName || "image.jpg",
-        type: asset.mimeType || "image/jpeg",
+        name: asset.fileName || (isVideo ? "video.mp4" : "image.jpg"),
+        type: asset.mimeType || (isVideo ? "video/mp4" : "image/jpeg"),
       } as any);
     }
     setSending(true);
+    setIsUploading(true);
+    setUploadProgress(0);
+    
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => Math.min(prev + 10, 90));
+    }, 200);
+    
     try {
       const uploadRes = await apiFetch(
         `${API_URL}/feed/feeds/${code}/upload-image`,
@@ -1580,21 +1495,29 @@ export default function FeedRoomScreen() {
           body: formData,
         },
       );
+      clearInterval(progressInterval);
       if (!uploadRes.ok) {
-        Alert.alert("Upload failed", "Could not upload image.");
+        setUploadProgress(0);
+        setIsUploading(false);
+        Alert.alert("Upload failed", "Could not upload media.");
         return;
       }
+      setUploadProgress(100);
       const { url } = (await uploadRes.json()) as { url: string };
-      // Send as message with media_url
       const msgRes = await apiFetch(`${API_URL}/feed/feeds/${code}/messages`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ content: "📷 Image", media_url: url }),
+        body: JSON.stringify({ 
+          content: isVideo ? "🎥 Video" : "📷 Image", 
+          media_url: url,
+          msg_type: isVideo ? "video" : "image"
+        }),
       });
       if (msgRes.ok) {
+        Haptics.messageSent();
         const data = (await msgRes.json()) as Record<string, unknown>;
         const newMsg = mapMessage(data);
         seenMessageIds.current.add(newMsg.id);
@@ -1605,9 +1528,113 @@ export default function FeedRoomScreen() {
         );
       }
     } catch {
-      Alert.alert("Error", "Could not send image.");
+      clearInterval(progressInterval);
+      setUploadProgress(0);
+      setIsUploading(false);
+      Haptics.error();
+      Alert.alert("Error", "Could not send media.");
     } finally {
       setSending(false);
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+      }, 500);
+    }
+  };
+
+  const handlePickDocument = async () => {
+    let DocumentPicker: typeof import("expo-document-picker");
+    try {
+      DocumentPicker = await import("expo-document-picker");
+    } catch {
+      Alert.alert(
+        "Document picker unavailable",
+        "Install expo-document-picker to share files.",
+      );
+      return;
+    }
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      const formData = new FormData();
+      if (Platform.OS === "web") {
+        const blob = await fetch(asset.uri).then((r) => r.blob());
+        formData.append("file", blob, asset.name);
+      } else {
+        formData.append("file", {
+          uri: asset.uri,
+          name: asset.name,
+          type: asset.mimeType || "application/octet-stream",
+        } as any);
+      }
+      setSending(true);
+      setIsUploading(true);
+      setUploadProgress(0);
+      
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 200);
+      
+      try {
+        const uploadRes = await apiFetch(
+          `${API_URL}/feed/feeds/${code}/upload-image`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          },
+        );
+        clearInterval(progressInterval);
+        if (!uploadRes.ok) {
+          setUploadProgress(0);
+          setIsUploading(false);
+          Alert.alert("Upload failed", "Could not upload document.");
+          return;
+        }
+        setUploadProgress(100);
+        const { url } = (await uploadRes.json()) as { url: string };
+        const msgRes = await apiFetch(`${API_URL}/feed/feeds/${code}/messages`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            content: `📄 ${asset.name}`, 
+            media_url: url,
+            msg_type: "file"
+          }),
+        });
+        if (msgRes.ok) {
+          Haptics.messageSent();
+          const data = (await msgRes.json()) as Record<string, unknown>;
+          const newMsg = mapMessage(data);
+          seenMessageIds.current.add(newMsg.id);
+          store.addMessage(newMsg);
+          setTimeout(
+            () => scrollRef.current?.scrollToEnd({ animated: true }),
+            80,
+          );
+        }
+      } catch {
+        clearInterval(progressInterval);
+        setUploadProgress(0);
+        setIsUploading(false);
+        Haptics.error();
+        Alert.alert("Error", "Could not send document.");
+      } finally {
+        setSending(false);
+        setTimeout(() => {
+          setIsUploading(false);
+          setUploadProgress(0);
+        }, 500);
+      }
+    } catch {
+      Alert.alert("Error", "Could not pick document.");
     }
   };
 
@@ -1685,6 +1712,19 @@ export default function FeedRoomScreen() {
       if (!token || !code) return;
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
+
+      // Load from cache first if offline
+      if (!isOnline) {
+        const cached = await getCachedMessages(code);
+        if (cached.length > 0) {
+          cached.forEach((m) => seenMessageIds.current.add(m.id));
+          store.setMessages(cached);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
+      }
+
       try {
         const res = await apiFetch(
           `${API_URL}/feed/feeds/${code}/messages?limit=40`,
@@ -1698,6 +1738,8 @@ export default function FeedRoomScreen() {
           mapped.forEach((m) => seenMessageIds.current.add(m.id));
           store.setMessages(mapped);
           setHasMore(data.length >= 40);
+          // Cache messages for offline use
+          await cacheMessages(code, mapped);
         } else if (res.status === 403) {
           Alert.alert("Access denied", "You are not a member of this feed.", [
             { text: "Join", onPress: () => router.replace("/feed/join") },
@@ -1727,14 +1769,20 @@ export default function FeedRoomScreen() {
             );
         }
       } catch {
-        if (!isRefresh)
+        // Load from cache on network error
+        const cached = await getCachedMessages(code);
+        if (cached.length > 0) {
+          cached.forEach((m) => seenMessageIds.current.add(m.id));
+          store.setMessages(cached);
+        } else if (!isRefresh) {
           Alert.alert("Error", "Network error. Pull down to retry.");
+        }
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [token, code],
+    [token, code, isOnline],
   );
 
   const loadMoreMessages = useCallback(async () => {
@@ -1934,16 +1982,39 @@ export default function FeedRoomScreen() {
   const sendMessage = useCallback(async () => {
     const trimmed = text.trim();
     if (!trimmed || sending || !token || !code) return;
-    // Weekly limit temporarily disabled
-    // if (store.weeklyCount >= store.weeklyLimit) {
-    //   setShowPaywall(true);
-    //   return;
-    // }
     setSending(true);
+    
+    // Edit mode
+    if (editingMsg) {
+      try {
+        const res = await fetch(`${API_URL}/feed/feeds/${code}/messages/${editingMsg.id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ content: trimmed }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as Record<string, unknown>;
+          store.updateMessage(mapMessage(data));
+          setText("");
+          setEditingMsg(null);
+          Haptics.messageSent();
+        } else {
+          Alert.alert("Error", "Could not edit message.");
+        }
+      } catch {
+        Alert.alert("Error", "Network error.");
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
     const replyId = replyTo?.id ?? null;
     setText("");
     setReplyTo(null);
-    Haptics.light();
     try {
       const res = await fetch(`${API_URL}/feed/feeds/${code}/messages`, {
         method: "POST",
@@ -1955,39 +2026,43 @@ export default function FeedRoomScreen() {
       });
       const data = (await res.json()) as Record<string, unknown>;
       if (res.ok) {
+        Haptics.messageSent();
         const mapped = mapMessage(data);
-        // Mark as seen so the WS broadcast doesn't add it a second time
         seenMessageIds.current.add(mapped.id);
         store.addMessage(mapped);
         store.incrementWeeklyCount();
+        cacheMessages(code, [...store.messages, mapped]);
         setTimeout(
           () => scrollRef.current?.scrollToEnd({ animated: true }),
           100,
         );
       } else if (res.status === 429) {
+        Haptics.error();
         setShowPaywall(true);
       } else if (res.status === 422) {
+        Haptics.error();
         Alert.alert(
           "Message flagged",
           "Your message was flagged by moderation. Keep it appropriate.",
         );
       } else {
-        // Show exact server error for debugging
+        Haptics.error();
         Alert.alert(
           `Error ${res.status}`,
           String(data.detail ?? JSON.stringify(data)),
         );
       }
     } catch (err) {
+      Haptics.error();
       Alert.alert("Network Error", String(err));
     } finally {
       setSending(false);
     }
-  }, [text, sending, token, code, replyTo, store]);
+  }, [text, sending, token, code, replyTo, editingMsg, store]);
 
   const handleReact = useCallback(
     (msgId: string, emoji: string) => {
-      Haptics.light();
+      Haptics.reaction();
       store.addReaction(msgId, emoji);
       // Sync to backend
       fetch(`${API_URL}/feed/feeds/${code}/messages/${msgId}/react`, {
@@ -2006,7 +2081,7 @@ export default function FeedRoomScreen() {
     (msgId: string) => {
       const msg = store.messages.find((m) => m.id === msgId);
       if (msg) {
-        Haptics.medium();
+        Haptics.longPress();
         setContextMsg(msg);
       }
     },
@@ -2199,6 +2274,16 @@ export default function FeedRoomScreen() {
             name={showSearch ? "close" : "search"}
             size={18}
             color={showSearch ? Colors.cyan : Colors.text.muted}
+          />
+        </Pressable>
+        <Pressable
+          onPress={() => setShowMediaGallery(true)}
+          style={{ padding: 4 }}
+        >
+          <Ionicons
+            name="images-outline"
+            size={18}
+            color={Colors.text.muted}
           />
         </Pressable>
         <Pressable
@@ -2547,6 +2632,7 @@ export default function FeedRoomScreen() {
                         onReply={setReplyTo}
                         onReact={handleReact}
                         onPickEmoji={handlePickEmoji}
+                        searchQuery={searchQuery}
                         onAvatarPress={() => {
                           const member = store.members.find(
                             (m) => m.id === msg.senderId,
@@ -2865,6 +2951,22 @@ export default function FeedRoomScreen() {
             </View>
           )}
 
+          {/* Upload progress */}
+          {isUploading && (
+            <Animated.View entering={SlideInUp.springify()} style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: Colors.bg.card, borderRadius: 12, marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.text.primary, fontSize: 12, fontFamily: 'Poppins_600SemiBold', marginBottom: 4 }}>
+                    Uploading... {uploadProgress}%
+                  </Text>
+                  <View style={{ height: 4, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
+                    <Animated.View style={{ width: `${uploadProgress}%`, height: '100%', backgroundColor: Colors.cyan, borderRadius: 2 }} />
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
+          )}
+
           {/* Input row — WhatsApp style */}
           <View
             style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}
@@ -2909,6 +3011,23 @@ export default function FeedRoomScreen() {
                   >
                     <Ionicons
                       name="image-outline"
+                      size={20}
+                      color={Colors.text.muted}
+                    />
+                  </Pressable>
+                  <Pressable
+                    onPress={handlePickDocument}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                    hitSlop={6}
+                  >
+                    <Ionicons
+                      name="document-outline"
                       size={20}
                       color={Colors.text.muted}
                     />
@@ -3253,7 +3372,20 @@ export default function FeedRoomScreen() {
         isOnline={
           !!memberSheet && store.onlineMemberIds.includes(memberSheet.id)
         }
+        isAdmin={isAdmin}
         onClose={() => setMemberSheet(null)}
+        onKick={async (memberId) => {
+          try {
+            await apiFetch(`${API_URL}/feed/feeds/${code}/members/${memberId}`, {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            store.setMembers(store.members.filter(m => m.id !== memberId));
+            Haptics.success();
+          } catch {
+            Alert.alert("Error", "Could not remove member.");
+          }
+        }}
       />
 
       {/* Forward modal */}
@@ -3387,6 +3519,201 @@ export default function FeedRoomScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Voice preview modal */}
+      <Modal
+        visible={!!voicePreview}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setVoicePreview(null)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.8)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: Colors.bg.card,
+              borderRadius: 20,
+              padding: 24,
+              width: "100%",
+              maxWidth: 320,
+              gap: 16,
+            }}
+          >
+            <Text
+              style={{
+                color: Colors.text.primary,
+                fontSize: 18,
+                fontFamily: "Poppins_600SemiBold",
+                textAlign: "center",
+              }}
+            >
+              Voice Message Preview
+            </Text>
+            {voicePreview && <VoiceBubble url={voicePreview} color={Colors.cyan} />}
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <Pressable
+                onPress={() => setVoicePreview(null)}
+                style={{
+                  flex: 1,
+                  backgroundColor: "rgba(255,255,255,0.08)",
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: Colors.text.secondary,
+                    fontSize: 15,
+                    fontFamily: "Poppins_600SemiBold",
+                  }}
+                >
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => voicePreview && sendVoiceMessage(voicePreview)}
+                disabled={sending}
+                style={{
+                  flex: 1,
+                  backgroundColor: Colors.cyan,
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  alignItems: "center",
+                  opacity: sending ? 0.6 : 1,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontSize: 15,
+                    fontFamily: "Poppins_600SemiBold",
+                  }}
+                >
+                  {sending ? "Sending..." : "Send"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Media gallery */}
+      <Modal
+        visible={showMediaGallery}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMediaGallery(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: Colors.bg.primary }}>
+          <SafeAreaView style={{ flex: 1 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: "rgba(255,255,255,0.06)",
+              }}
+            >
+              <Pressable onPress={() => setShowMediaGallery(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </Pressable>
+              <Text
+                style={{
+                  flex: 1,
+                  color: Colors.text.primary,
+                  fontSize: 18,
+                  fontFamily: "Poppins_600SemiBold",
+                  marginLeft: 16,
+                }}
+              >
+                Media Gallery
+              </Text>
+            </View>
+            <ScrollView
+              contentContainerStyle={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                padding: 4,
+              }}
+            >
+              {store.messages
+                .filter((m) => m.mediaUrl && (m.msgType === "image" || m.msgType === "video"))
+                .reverse()
+                .map((msg) => (
+                  <Pressable
+                    key={msg.id}
+                    onPress={() => {
+                      const { Linking } = require("react-native");
+                      Linking.openURL(msg.mediaUrl!);
+                    }}
+                    style={{
+                      width: "33.33%",
+                      aspectRatio: 1,
+                      padding: 2,
+                    }}
+                  >
+                    <Image
+                      source={{ uri: msg.mediaUrl! }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        borderRadius: 4,
+                      }}
+                      resizeMode="cover"
+                    />
+                    {msg.msgType === "video" && (
+                      <View
+                        style={{
+                          position: "absolute",
+                          top: 8,
+                          right: 8,
+                          backgroundColor: "rgba(0,0,0,0.6)",
+                          borderRadius: 12,
+                          padding: 4,
+                        }}
+                      >
+                        <Ionicons name="play" size={16} color="#fff" />
+                      </View>
+                    )}
+                  </Pressable>
+                ))}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
+      {/* Voice preview, media gallery, forward modals */}
+      <VoicePreviewModal
+        visible={!!voicePreview}
+        voiceUri={voicePreview}
+        sending={sending}
+        onCancel={() => setVoicePreview(null)}
+        onSend={sendVoiceMessage}
+      />
+
+      <MediaGalleryModal
+        visible={showMediaGallery}
+        messages={store.messages}
+        onClose={() => setShowMediaGallery(false)}
+      />
+
+      <ForwardModal
+        visible={!!forwardMsg}
+        message={forwardMsg}
+        feeds={myFeeds}
+        onClose={() => setForwardMsg(null)}
+        onForward={handleForward}
+      />
 
       {/* Paywall */}
       {showPaywall && (

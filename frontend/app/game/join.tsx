@@ -4,10 +4,10 @@ import {
   Text,
   TextInput,
   Pressable,
-  SafeAreaView,
   Alert,
   StyleSheet,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Animated, {
   useSharedValue,

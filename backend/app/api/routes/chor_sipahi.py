@@ -1,8 +1,13 @@
 """
-Chor Sipahi — API routes.
-Classic Indian social-deduction party game.
-Roles: Raja (King) | Mantri (Minister) | Sipahi (Police) | Chor (Thief)
-Mantri must identify who is Chor (and Sipahi). Chor wins if not caught.
+Harami-Shurta — API routes.
+Classic social-deduction party game with Arabic names.
+Roles: Malik (King) | Wazir (Minister) | Shurta (Police) | Harami (Thief)
+Wazir must identify who is Harami (and Shurta). Harami wins if not caught.
+
+Scoring:
+- Malik: Always 1000 pts
+- If Wazir correct: Wazir 500, Shurta 300, Harami 0
+- If Wazir wrong: Harami 500, Shurta 300, Wazir 0
 """
 import asyncio
 import random
@@ -47,13 +52,13 @@ MODE_TIMINGS = {
 }
 
 SCORING = {
-    "raja":   100,
-    "mantri": {"correct": 200, "wrong": 0},
-    "sipahi": {"chor_caught": 150, "chor_free": 0},
-    "chor":   {"caught": 0, "free": 300},
+    "malik":   1000,
+    "wazir": {"correct": 500, "wrong": 0},
+    "shurta": 300,  # Always gets 300
+    "harami":   {"caught": 0, "free": 500},
 }
 
-ROLE_EMOJIS = {"raja": "👑", "mantri": "🧾", "sipahi": "👮", "chor": "🕵️"}
+ROLE_EMOJIS = {"malik": "👑", "wazir": "🧾", "shurta": "👮", "harami": "🕵️"}
 
 
 def _gen_code() -> str:
@@ -98,8 +103,8 @@ def _safe_players(players: list[CSPlayer], viewer_user_id: str, reveal_all: bool
             "points": p.points,
             "joinOrder": p.join_order,
             "isBot": p.is_bot,
-            # Only reveal own role, or raja role (always public)
-            "role": p.role if (reveal_all or p.user_id == viewer_user_id or p.role == "raja") else None,
+            # Raja and Mantri are public; Sipahi/Chor stay hidden until result.
+            "role": p.role if (reveal_all or p.user_id == viewer_user_id or p.role in {"raja", "mantri"}) else None,
         }
         out.append(d)
     return out
@@ -131,8 +136,8 @@ async def _assign_roles(room: CSRoom, players: list[CSPlayer], db: AsyncSession)
     # If fewer players, skip some roles (minimum 3 needed)
     active = [p for p in players]
     n = len(active)
-    if n < 3:
-        raise ValueError("Need at least 3 players")
+    if n < 4:
+        raise ValueError("Need at least 4 players")
 
     # Rotate starting position each round so roles rotate
     offset = (room.current_round - 1) % n
@@ -293,7 +298,7 @@ def _round_public(round_: CSRound | None) -> dict | None:
         "roundNumber": round_.round_number,
         "rajaId": round_.raja_id,
         # Only public info: Raja is always known
-        "mantriId": None,
+        "mantriId": round_.mantri_id,
         "sipahiId": None,
         "chorId": None,
         "guessChorId": round_.guess_chor_id,
@@ -514,8 +519,8 @@ async def start_game(
 
     players_r = await db.execute(select(CSPlayer).where(CSPlayer.room_id == room.id))
     players = list(players_r.scalars().all())
-    if len(players) < 3:
-        raise HTTPException(status_code=400, detail="Need at least 3 players")
+    if len(players) < 4:
+        raise HTTPException(status_code=400, detail="Need at least 4 players")
 
     room.status = "playing"
     room.current_round = 1
@@ -570,6 +575,13 @@ async def submit_guess(
         raise HTTPException(status_code=403, detail="Only Mantri can guess")
     if round_.guess_chor_id:
         raise HTTPException(status_code=400, detail="Already guessed")
+    valid_unknown = {round_.chor_id, round_.sipahi_id}
+    if (
+        body.guess_chor_id == body.guess_sipahi_id
+        or body.guess_chor_id not in valid_unknown
+        or body.guess_sipahi_id not in valid_unknown
+    ):
+        raise HTTPException(status_code=400, detail="Guess must assign Chor and Sipahi from the two hidden players")
 
     round_.guess_chor_id = body.guess_chor_id
     round_.guess_sipahi_id = body.guess_sipahi_id

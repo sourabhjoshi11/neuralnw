@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { View, Text, Switch, Pressable, ScrollView, SafeAreaView, Alert } from 'react-native';
+import { View, Text, Switch, Pressable, ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, BorderRadius } from '@/constants/theme';

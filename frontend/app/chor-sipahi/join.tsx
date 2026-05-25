@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { View, Text, Pressable, SafeAreaView, Alert, TextInput } from 'react-native';
+import { View, Text, Pressable, Alert, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { View, Text, Platform } from "react-native";
 import Animated, {
   useSharedValue,
@@ -9,7 +9,8 @@ import Animated, {
   Easing,
   runOnJS,
 } from "react-native-reanimated";
-import type { AudioPlayer } from "expo-audio";
+import { Audio } from 'expo-av';
+import type { Sound } from 'expo-av/build/Audio';
 import Svg, {
   Path,
   Circle,
@@ -21,6 +22,8 @@ import Svg, {
 } from "react-native-svg";
 import type { AnonPlayer } from "@/types";
 import { useSettingsStore } from "@/store/settingsStore";
+import { ConfettiCelebration, FlashOverlay } from "@/components/game/ConfettiCelebration";
+import { SpinParticles } from "@/components/game/SpinParticles";
 
 type Props = {
   players: AnonPlayer[];
@@ -68,10 +71,11 @@ export function SpinWheel({
   const glowScale = useSharedValue(1);
   const pointerY = useSharedValue(0);
   const isAnimating = useRef(false);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   // Sound refs
-  const tickSoundRef = useRef<AudioPlayer | null>(null);
-  const spinEndSoundRef = useRef<AudioPlayer | null>(null);
+  const tickSoundRef = useRef<Sound | null>(null);
+  const spinEndSoundRef = useRef<Sound | null>(null);
   const tickTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const wheelStyle = useAnimatedStyle(() => ({
@@ -92,18 +96,17 @@ export function SpinWheel({
     async function loadSound() {
       if (Platform.OS === "web") return;
       try {
-        const { createAudioPlayer, setAudioModeAsync } = await import("expo-audio");
-        await setAudioModeAsync({ playsInSilentMode: true });
-        const player = createAudioPlayer(require("../../assets/sounds/tick.wav"), {
-          keepAudioSessionActive: true,
-        });
-        const endPlayer = createAudioPlayer(require("../../assets/sounds/spin_end.wav"), {
-          keepAudioSessionActive: true,
-        });
-        player.volume = 0.7;
-        endPlayer.volume = 0.85;
-        tickSoundRef.current = player;
-        spinEndSoundRef.current = endPlayer;
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+        const { sound: tickSound } = await Audio.Sound.createAsync(
+          require("../../assets/sounds/tick.wav"),
+          { shouldPlay: false, volume: 0.7 }
+        );
+        const { sound: endSound } = await Audio.Sound.createAsync(
+          require("../../assets/sounds/spin_end.wav"),
+          { shouldPlay: false, volume: 0.85 }
+        );
+        tickSoundRef.current = tickSound;
+        spinEndSoundRef.current = endSound;
       } catch {
         // Audio may not be available in this runtime.
       }
@@ -111,8 +114,8 @@ export function SpinWheel({
 
     loadSound();
     return () => {
-      tickSoundRef.current?.remove();
-      spinEndSoundRef.current?.remove();
+      tickSoundRef.current?.unloadAsync();
+      spinEndSoundRef.current?.unloadAsync();
     };
   }, []);
 
@@ -123,12 +126,13 @@ export function SpinWheel({
       withTiming(8, { duration: 80 }),
       withSpring(0, { damping: 4, stiffness: 300, mass: 0.6 }),
     );
-    if (useSettingsStore.getState().soundEnabled) {
-      spinEndSoundRef.current
-        ?.seekTo(0)
-        .then(() => spinEndSoundRef.current?.play())
-        .catch(() => {});
+    if (useSettingsStore.getState().soundEnabled && spinEndSoundRef.current) {
+      spinEndSoundRef.current.setPositionAsync(0).then(() => 
+        spinEndSoundRef.current?.playAsync()
+      ).catch(() => {});
     }
+    setShowCelebration(true);
+    setTimeout(() => setShowCelebration(false), 1500);
     onSpinComplete?.();
   }, [onSpinComplete]);
 
@@ -136,10 +140,9 @@ export function SpinWheel({
   const playTick = useCallback(() => {
     if (!useSettingsStore.getState().soundEnabled) return;
     if (!tickSoundRef.current) return;
-    tickSoundRef.current
-      .seekTo(0)
-      .then(() => tickSoundRef.current?.play())
-      .catch(() => {});
+    tickSoundRef.current.setPositionAsync(0).then(() => 
+      tickSoundRef.current?.playAsync()
+    ).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -200,22 +203,25 @@ export function SpinWheel({
     }
     tickTimers.current = timers;
 
+    const overshootAngle = 15; // Degrees to overshoot
+    const finalAngle = endAngle + overshootAngle;
+
     rotation.value = withSequence(
-      withTiming(midAngle, {
-        duration: 1000,
-        easing: Easing.in(Easing.cubic),
-      }),
       withTiming(
-        endAngle,
+        finalAngle,
         {
-          duration: 3600,
-          easing: Easing.out(Easing.cubic),
-        },
-        () => {
-          "worklet";
-          runOnJS(onAnimDone)();
-        },
+          duration: 4400,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        }
       ),
+      withSpring(endAngle, {
+        damping: 15,
+        stiffness: 100,
+        mass: 0.8,
+      }, () => {
+        "worklet";
+        runOnJS(onAnimDone)();
+      })
     );
   }, [spinning, targetPlayerId]);
 
@@ -398,7 +404,21 @@ export function SpinWheel({
         >
           <Text style={{ fontSize: 18 }}>🍾</Text>
         </View>
+
+        {/* Spin particles */}
+        <SpinParticles active={spinning} size={size} />
+
+        {/* Winner celebration */}
+        <ConfettiCelebration
+          active={showCelebration}
+          centerX={cx}
+          centerY={cy}
+          color={winnerColor}
+        />
       </View>
+
+      {/* Flash overlay */}
+      <FlashOverlay active={showCelebration} color={winnerColor} />
     </View>
   );
 }

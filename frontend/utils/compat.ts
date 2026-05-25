@@ -13,40 +13,65 @@ function hapticsEnabled() {
 // ─── Haptics ─────────────────────────────────────────────────────────────────
 
 export const Haptics = {
+  // Subtle tap for UI interactions (buttons, tabs)
   light: () => {
     if (Platform.OS === 'web') return;
     if (!hapticsEnabled()) return;
     ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Light).catch(() => {});
   },
+  // Standard feedback for most actions
   medium: () => {
     if (Platform.OS === 'web') return;
     if (!hapticsEnabled()) return;
     ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Medium).catch(() => {});
   },
+  // Strong feedback for important actions
   heavy: () => {
     if (Platform.OS === 'web') return;
     if (!hapticsEnabled()) return;
     ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Heavy).catch(() => {});
   },
+  // Subtle selection feedback (like WhatsApp message selection)
   selection: () => {
     if (Platform.OS === 'web') return;
     if (!hapticsEnabled()) return;
     ExpoHaptics.selectionAsync().catch(() => {});
   },
+  // Success notification (message sent, action completed)
   success: () => {
     if (Platform.OS === 'web') return;
     if (!hapticsEnabled()) return;
     ExpoHaptics.notificationAsync(ExpoHaptics.NotificationFeedbackType.Success).catch(() => {});
   },
+  // Error notification
   error: () => {
     if (Platform.OS === 'web') return;
     if (!hapticsEnabled()) return;
     ExpoHaptics.notificationAsync(ExpoHaptics.NotificationFeedbackType.Error).catch(() => {});
   },
+  // Warning notification
   warning: () => {
     if (Platform.OS === 'web') return;
     if (!hapticsEnabled()) return;
     ExpoHaptics.notificationAsync(ExpoHaptics.NotificationFeedbackType.Warning).catch(() => {});
+  },
+  // WhatsApp-style: very subtle tap for message reactions
+  reaction: () => {
+    if (Platform.OS === 'web') return;
+    if (!hapticsEnabled()) return;
+    ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Light).catch(() => {});
+  },
+  // WhatsApp-style: subtle feedback when long-pressing messages
+  longPress: () => {
+    if (Platform.OS === 'web') return;
+    if (!hapticsEnabled()) return;
+    ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Medium).catch(() => {});
+  },
+  // WhatsApp-style: feedback when sending message
+  messageSent: () => {
+    if (Platform.OS === 'web') return;
+    if (!hapticsEnabled()) return;
+    ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Light).catch(() => {});
   },
 };
 

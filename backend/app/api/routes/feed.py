@@ -1,4 +1,5 @@
 import json
+import logging
 import random
 import re
 import string
@@ -11,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.core.security import decode_access_token
 from app.db.base import get_db
 from app.models.feed import Feed, FeedMember, FeedMessage
@@ -20,6 +22,7 @@ from app.services.moderation import is_content_safe
 from app.services.username import generate_username
 
 router = APIRouter(prefix="/feed", tags=["feed"])
+logger = logging.getLogger(__name__)
 
 
 def _generate_feed_code() -> str:
@@ -713,70 +716,98 @@ async def upload_image(
     user: User = Depends(get_current_user),
 ):
     """Upload image or audio to Supabase Storage, return public URL."""
-    import httpx, uuid as _uuid
+    try:
+        import httpx, uuid as _uuid
+        
+        logger.info(f"Upload request: code={code}, filename={file.filename}, content_type={file.content_type}")
 
-    feed_result = await db.execute(select(Feed).where(Feed.code == code))
-    feed = feed_result.scalar_one_or_none()
-    if not feed:
-        raise HTTPException(status_code=404, detail="Feed not found")
+        feed_result = await db.execute(select(Feed).where(Feed.code == code))
+        feed = feed_result.scalar_one_or_none()
+        if not feed:
+            logger.error(f"Feed not found: {code}")
+            raise HTTPException(status_code=404, detail="Feed not found")
 
-    member_result = await db.execute(
-        select(FeedMember).where(FeedMember.feed_id == feed.id, FeedMember.user_id == user.id)
-    )
-    if not member_result.scalar_one_or_none():
-        raise HTTPException(status_code=403, detail="Not a member")
+        member_result = await db.execute(
+            select(FeedMember).where(FeedMember.feed_id == feed.id, FeedMember.user_id == user.id)
+        )
+        if not member_result.scalar_one_or_none():
+            logger.error(f"User {user.id} not a member of feed {feed.id}")
+            raise HTTPException(status_code=403, detail="Not a member")
 
-    # Validate content type — allow images and audio (voice messages)
-    allowed = {
-        "image/jpeg", "image/png", "image/gif", "image/webp",
-        "audio/m4a", "audio/mp4", "audio/aac", "audio/mpeg",
-        "audio/x-m4a", "audio/3gpp", "audio/webm", "audio/ogg",
-        "application/octet-stream",
-    }
-    if file.content_type and file.content_type not in allowed:
-        raise HTTPException(status_code=400, detail="File type not supported")
+        # Validate content type — allow images, videos, and audio (voice messages)
+        allowed = {
+            "image/jpeg", "image/png", "image/gif", "image/webp",
+            "video/mp4", "video/quicktime", "video/x-msvideo", "video/webm",
+            "audio/m4a", "audio/mp4", "audio/aac", "audio/mpeg",
+            "audio/x-m4a", "audio/3gpp", "audio/webm", "audio/ogg",
+            "application/octet-stream",
+        }
+        if file.content_type and file.content_type not in allowed:
+            logger.error(f"Unsupported content type: {file.content_type}")
+            raise HTTPException(status_code=400, detail=f"File type not supported: {file.content_type}")
 
-    # Max 10MB
-    contents = await file.read()
-    if len(contents) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+        # Max 50MB for videos, 10MB for images/audio
+        max_size = 50 * 1024 * 1024 if file.content_type and file.content_type.startswith("video/") else 10 * 1024 * 1024
+        contents = await file.read()
+        logger.info(f"File size: {len(contents)} bytes, max: {max_size}")
+        if len(contents) > max_size:
+            logger.error(f"File too large: {len(contents)} > {max_size}")
+            raise HTTPException(status_code=400, detail=f"File too large (max {max_size // (1024*1024)}MB)")
 
-    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "jpg"
-    ext = re.sub(r"[^a-zA-Z0-9]", "", ext)[:12] or "jpg"
-    filename = f"feed/{code}/{_uuid.uuid4()}.{ext}"
-    bucket = "classchaos-media"
+        ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "jpg"
+        ext = re.sub(r"[^a-zA-Z0-9]", "", ext)[:12] or "jpg"
+        filename = f"feed/{code}/{_uuid.uuid4()}.{ext}"
+        bucket = "classchaos-media"
+        
+        logger.info(f"Target filename: {filename}, bucket: {bucket}")
+        logger.info(f"Supabase configured: URL={bool(settings.SUPABASE_URL)}, KEY={bool(settings.SUPABASE_SERVICE_KEY)}")
 
-    if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_KEY:
-        upload_url = f"{settings.SUPABASE_URL}/storage/v1/object/{bucket}/{filename}"
-        try:
-            async with httpx.AsyncClient(timeout=20) as client:
-                resp = await client.post(
-                    upload_url,
-                    content=contents,
-                    headers={
-                        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}",
-                        "Content-Type": file.content_type or "image/jpeg",
-                    },
-                )
-        except httpx.HTTPError as exc:
-            if settings.APP_ENV != "development":
-                raise HTTPException(status_code=502, detail="Storage upload failed") from exc
-        else:
-            if resp.status_code in (200, 201):
-                public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{bucket}/{filename}"
-                return {"url": public_url}
-            if settings.APP_ENV != "development":
-                raise HTTPException(status_code=502, detail="Storage upload failed")
-    elif settings.APP_ENV != "development":
-        raise HTTPException(status_code=503, detail="Storage not configured")
+        if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_KEY:
+            upload_url = f"{settings.SUPABASE_URL}/storage/v1/object/{bucket}/{filename}"
+            logger.info(f"Uploading to Supabase: {upload_url}")
+            try:
+                async with httpx.AsyncClient(timeout=20) as client:
+                    resp = await client.post(
+                        upload_url,
+                        content=contents,
+                        headers={
+                            "Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}",
+                            "Content-Type": file.content_type or "image/jpeg",
+                        },
+                    )
+                    logger.info(f"Supabase response: status={resp.status_code}, body={resp.text[:200]}")
+            except httpx.HTTPError as exc:
+                logger.error(f"Supabase upload failed: {exc}")
+                if settings.APP_ENV != "development":
+                    raise HTTPException(status_code=502, detail="Storage upload failed") from exc
+            else:
+                if resp.status_code in (200, 201):
+                    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{bucket}/{filename}"
+                    logger.info(f"Upload successful: {public_url}")
+                    return {"url": public_url}
+                logger.error(f"Supabase upload failed with status {resp.status_code}")
+                if settings.APP_ENV != "development":
+                    raise HTTPException(status_code=502, detail="Storage upload failed")
+        elif settings.APP_ENV != "development":
+            logger.error("Storage not configured in production")
+            raise HTTPException(status_code=503, detail="Storage not configured")
 
-    # Development fallback: keep uploads working if Supabase Storage is down
-    # or the storage bucket has not been created yet.
-    local_path = Path("uploads") / filename
-    local_path.parent.mkdir(parents=True, exist_ok=True)
-    local_path.write_bytes(contents)
-    public_path = filename.replace("\\", "/")
-    return {"url": f"{str(request.base_url).rstrip('/')}/uploads/{public_path}"}
+        # Development fallback: keep uploads working if Supabase Storage is down
+        # or the storage bucket has not been created yet.
+        logger.info("Using local storage fallback")
+        local_path = Path("uploads") / filename
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.write_bytes(contents)
+        public_path = filename.replace("\\", "/")
+        fallback_url = f"{str(request.base_url).rstrip('/')}/uploads/{public_path}"
+        logger.info(f"Local storage: {fallback_url}")
+        return {"url": fallback_url}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in upload_image: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
 @router.post("/feeds/{code}/messages/{message_id}/seen", status_code=204)

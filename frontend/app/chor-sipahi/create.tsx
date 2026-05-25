@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, Pressable, SafeAreaView, Alert, ScrollView } from 'react-native';
+import { View, Text, Pressable, Alert, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';
@@ -122,10 +123,10 @@ export default function CreateChorSipahiScreen() {
         <View style={{ backgroundColor: Colors.bg.card, borderRadius: 14, padding: 16, gap: 10, borderWidth: 1, borderColor: Colors.border }}>
           <Text style={{ fontSize: 14, fontFamily: 'Poppins_600SemiBold', color: Colors.text.primary }}>How to play</Text>
           {[
-            { role: '👑 Raja',   desc: 'Revealed to all. Safe — gets 100 pts.' },
-            { role: '🧾 Mantri', desc: 'Must identify who is Chor & Sipahi.' },
-            { role: '👮 Sipahi', desc: 'Hidden. Gets 150 pts if Chor is caught.' },
-            { role: '🕵️ Chor',  desc: 'Hidden. Gets 300 pts if NOT caught!' },
+            { role: '👑 Malik',   desc: 'Revealed to all. Always gets 1000 pts.' },
+            { role: '🧾 Wazir', desc: 'Must identify Harami & Shurta. Gets 500 if correct, 0 if wrong.' },
+            { role: '👮 Shurta', desc: 'Hidden. Gets 300 pts if Harami caught, 300 if not.' },
+            { role: '🕵️ Harami',  desc: 'Hidden. Gets 500 pts if NOT caught, 0 if caught!' },
           ].map((r) => (
             <View key={r.role} style={{ flexDirection: 'row', gap: 10 }}>
               <Text style={{ fontSize: 13, fontFamily: 'Poppins_600SemiBold', color: Colors.text.primary, width: 90 }}>{r.role}</Text>

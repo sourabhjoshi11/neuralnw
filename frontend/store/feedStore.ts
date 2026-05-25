@@ -34,6 +34,7 @@ type FeedState = {
   addOnlineMember: (id: string) => void;
   removeOnlineMember: (id: string) => void;
   editMessage: (messageId: string, content: string, editedAt: string) => void;
+  updateMessage: (message: FeedMessage) => void;
   updateReactions: (messageId: string, reactions: Record<string, number>) => void;
   updatePoll: (messageId: string, pollVotes: Record<string, string[]> | null) => void;
   updateSeenBy: (messageId: string, seenBy: string[]) => void;
@@ -119,6 +120,13 @@ export const useFeedStore = create<FeedState>()(
         set((state) => ({
           messages: state.messages.map((m) =>
             m.id === messageId ? { ...m, content, editedAt } : m
+          ),
+        })),
+
+      updateMessage: (message: FeedMessage) =>
+        set((state) => ({
+          messages: state.messages.map((m) =>
+            m.id === message.id ? message : m
           ),
         })),
 

@@ -9,7 +9,6 @@ import React, {
 import {
   View,
   Text,
-  SafeAreaView,
   ScrollView,
   Pressable,
   ActivityIndicator,
@@ -19,6 +18,7 @@ import {
   StatusBar,
   TextInput,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import Animated, {
   useSharedValue,
@@ -41,6 +41,9 @@ import { useGameStore } from "@/store/gameStore";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useGameTimer } from "@/hooks/useGameTimer";
 import { SpinWheel } from "@/components/ui/SpinWheel";
+import { SpinHistory } from "@/components/game/SpinHistory";
+import { EnhancedLeaderboard } from "@/components/game/EnhancedLeaderboard";
+import { LivesDisplay } from "@/components/game/LivesDisplay";
 import {
   TruthQuestionView,
   TruthAnswerView,
@@ -1432,6 +1435,7 @@ function SpinPhaseView({
   currentTurnPlayerId: string | null;
   onMyTurnRevealed?: () => void;
 }) {
+  const spinHistory = useGameStore((s) => s.spinHistory);
   const activePlayers = players.filter((p) => !p.isBlackedOut);
   const displayPlayers = activePlayers.length > 0 ? activePlayers : players;
 
@@ -1606,6 +1610,9 @@ function SpinPhaseView({
           🍾 Spinning...
         </Text>
       )}
+
+      {/* Spin History */}
+      <SpinHistory history={spinHistory} players={players} />
     </View>
   );
 }
@@ -3106,35 +3113,48 @@ function ActiveView({
       </Animated.View>
 
       {/* Floating 📊 Scores button */}
-      <Pressable
-        onPress={openScoreboard}
+      <View
         style={{
           position: "absolute",
           top: 8,
           right: 12,
-          backgroundColor: "rgba(59,130,246,0.15)",
-          borderWidth: 1,
-          borderColor: "rgba(59,130,246,0.3)",
-          borderRadius: 10,
-          paddingHorizontal: 10,
-          paddingVertical: 6,
           flexDirection: "row",
-          alignItems: "center",
-          gap: 4,
+          gap: 8,
           zIndex: 50,
         }}
       >
-        <Text style={{ fontSize: 13 }}>📊</Text>
-        <Text
+        {/* Lives Display */}
+        {myPlayer && (
+          <LivesDisplay skipsUsed={myPlayer.skipsUsed} showLabel={false} />
+        )}
+
+        {/* Scores Button */}
+        <Pressable
+          onPress={openScoreboard}
           style={{
-            color: Colors.blue,
-            fontSize: 11,
-            fontFamily: "Poppins_600SemiBold",
+            backgroundColor: "rgba(59,130,246,0.15)",
+            borderWidth: 1,
+            borderColor: "rgba(59,130,246,0.3)",
+            borderRadius: 10,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
           }}
         >
-          Scores
-        </Text>
-      </Pressable>
+          <Text style={{ fontSize: 13 }}>📊</Text>
+          <Text
+            style={{
+              color: Colors.blue,
+              fontSize: 11,
+              fontFamily: "Poppins_600SemiBold",
+            }}
+          >
+            Scores
+          </Text>
+        </Pressable>
+      </View>
 
       {/* Backdrop — tap outside to close */}
       {showScoreboard && (
@@ -3202,21 +3222,10 @@ function ActiveView({
           </View>
 
           {/* Player score rows */}
-          <ScrollView
-            contentContainerStyle={{ padding: 12, paddingBottom: 32 }}
-            showsVerticalScrollIndicator={false}
-          >
-            {sortedScoreboardPlayers.map((p, idx) => (
-              <ScoreBar
-                key={p.id}
-                player={p}
-                rank={idx + 1}
-                maxPoints={scoreboardMaxPoints}
-                isMe={p.id === myPlayer?.id}
-                isTurn={p.id === currentTurnPlayerId}
-              />
-            ))}
-          </ScrollView>
+          <EnhancedLeaderboard
+            players={sortedScoreboardPlayers}
+            myPlayerId={myPlayer?.id}
+          />
         </Animated.View>
       )}
     </View>
@@ -3265,99 +3274,8 @@ const EndedView = memo(function EndedView({
       </View>
 
       {/* Leaderboard */}
-      <View
-        style={{
-          backgroundColor: Colors.bg.card,
-          borderRadius: BorderRadius.card,
-          borderWidth: 1,
-          borderColor: "rgba(255,255,255,0.06)",
-          overflow: "hidden",
-        }}
-      >
-        {sorted.map((player, idx) => {
-          const isWinner = idx === 0;
-          const isMe = player.id === myPlayer?.id;
-
-          return (
-            <View key={player.id}>
-              <LinearGradient
-                colors={
-                  isWinner
-                    ? ["rgba(245,158,11,0.1)", "rgba(245,158,11,0.03)"]
-                    : ["transparent", "transparent"]
-                }
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 12,
-                  paddingVertical: 13,
-                  paddingHorizontal: 16,
-                  backgroundColor: isMe ? "rgba(59,130,246,0.06)" : undefined,
-                }}
-              >
-                <Text style={{ fontSize: 18, width: 26, textAlign: "center" }}>
-                  {idx < 3 ? medals[idx] : `${idx + 1}.`}
-                </Text>
-                <View
-                  style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 19,
-                    backgroundColor: player.color + "22",
-                    borderWidth: isWinner ? 2 : 1.5,
-                    borderColor: isWinner ? Colors.yellow : player.color,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: isWinner ? Colors.yellow : player.color,
-                      fontSize: 14,
-                      fontFamily: "Poppins_700Bold",
-                    }}
-                  >
-                    {player.username[0]?.toUpperCase()}
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    flex: 1,
-                    color: isMe
-                      ? Colors.blue
-                      : isWinner
-                        ? Colors.yellow
-                        : Colors.text.primary,
-                    fontSize: 14,
-                    fontFamily: "Poppins_700Bold",
-                  }}
-                  numberOfLines={1}
-                >
-                  {player.username}
-                  {isMe ? " (you)" : ""}
-                </Text>
-                <Text
-                  style={{
-                    color: isWinner ? Colors.yellow : Colors.text.secondary,
-                    fontSize: 14,
-                    fontFamily: "Poppins_700Bold",
-                  }}
-                >
-                  {player.points}pt
-                </Text>
-              </LinearGradient>
-              {idx < sorted.length - 1 && (
-                <View
-                  style={{
-                    height: 1,
-                    backgroundColor: "rgba(255,255,255,0.04)",
-                    marginHorizontal: 16,
-                  }}
-                />
-              )}
-            </View>
-          );
-        })}
+      <View style={{ flex: 1, minHeight: 400 }}>
+        <EnhancedLeaderboard players={sorted} myPlayerId={myPlayer?.id} />
       </View>
 
       {/* Identity reveal */}
