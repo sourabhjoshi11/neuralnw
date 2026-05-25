@@ -1,9 +1,7 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
-
     APP_ENV: str = "development"
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
@@ -23,6 +21,11 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379"
 
     ALLOWED_ORIGINS: str = "http://localhost:3000"
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        extra = "ignore"
 
     @property
     def origins(self) -> list[str]:
