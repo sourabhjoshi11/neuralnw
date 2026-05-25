@@ -53,7 +53,7 @@ class FeedOut(BaseModel):
     created_at: datetime
     
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class FeedMemberOut(BaseModel):
@@ -66,7 +66,7 @@ class FeedMemberOut(BaseModel):
     week_resets_at: datetime | None
     
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class PostMessageRequest(BaseModel):
@@ -109,7 +109,7 @@ class FeedMessageOut(BaseModel):
     expires_at: datetime
     
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class EditMessageRequest(BaseModel):
@@ -189,7 +189,7 @@ async def create_feed(
     await db.refresh(feed)
     await db.refresh(member)
 
-    return {"feed": FeedOut.model_validate(feed), "member": FeedMemberOut.model_validate(member)}
+    return {"feed": FeedOut.from_orm(feed), "member": FeedMemberOut.from_orm(member)}
 
 
 @router.post("/feeds/{code}/join")
@@ -219,7 +219,7 @@ async def join_feed(
     await db.commit()
     await db.refresh(member)
 
-    return {"feed": FeedOut.model_validate(feed), "member": FeedMemberOut.model_validate(member)}
+    return {"feed": FeedOut.from_orm(feed), "member": FeedMemberOut.from_orm(member)}
 
 
 @router.post("/feeds/{code}/messages", response_model=FeedMessageOut)
@@ -335,7 +335,7 @@ async def get_my_membership(
     if not member:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member")
 
-    return FeedMemberOut.model_validate(member)
+    return FeedMemberOut.from_orm(member)
 
 
 @router.get("/feeds/{code}/members", response_model=list[FeedMemberOut])
@@ -570,7 +570,7 @@ async def pin_message(
         "data": {"pinned_message_id": message_id},
     })
 
-    return FeedOut.model_validate(feed)
+    return FeedOut.from_orm(feed)
 
 
 
@@ -608,7 +608,7 @@ async def create_poll(
     await db.commit()
     await db.refresh(msg)
 
-    out = FeedMessageOut.model_validate(msg)
+    out = FeedMessageOut.from_orm(msg)
     await feed_manager.broadcast(code, {"type": "new_message", "data": out.model_dump(mode="json")})
     return out
 
@@ -657,7 +657,7 @@ async def poll_vote(
     db.add(msg)
     await db.commit()
 
-    out = FeedMessageOut.model_validate(msg)
+    out = FeedMessageOut.from_orm(msg)
     await feed_manager.broadcast(code, {"type": "poll_updated", "data": out.model_dump(mode="json")})
 
 
@@ -894,7 +894,7 @@ async def set_visibility(
     db.add(feed)
     await db.commit()
     await db.refresh(feed)
-    return FeedOut.model_validate(feed)
+    return FeedOut.from_orm(feed)
 
 
 @router.websocket("/ws/{code}")

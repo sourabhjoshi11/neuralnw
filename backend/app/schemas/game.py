@@ -123,7 +123,7 @@ class RoomOut(BaseModel):
     created_at: datetime
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class AnonPlayerOut(BaseModel):
@@ -142,7 +142,7 @@ class AnonPlayerOut(BaseModel):
     join_order: int
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class JoinRoomResponse(BaseModel):

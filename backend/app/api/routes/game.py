@@ -75,7 +75,7 @@ async def create_room(
         player_count=1,
         created_at=room.created_at,
     )
-    return JoinRoomResponse(room=room_out, player=AnonPlayerOut.model_validate(player), players=[AnonPlayerOut.model_validate(player)])
+    return JoinRoomResponse(room=room_out, player=AnonPlayerOut.from_orm(player), players=[AnonPlayerOut.from_orm(player)])
 
 
 @router.post("/rooms/{code}/join", response_model=JoinRoomResponse)
@@ -99,7 +99,7 @@ async def join_room(
     # If already in room — rejoin gracefully (return existing player data)
     existing = next((p for p in all_players if p.user_id == user.id), None)
     if existing:
-        all_players_out = [AnonPlayerOut.model_validate(p) for p in all_players]
+        all_players_out = [AnonPlayerOut.from_orm(p) for p in all_players]
         room_out = RoomOut(
             id=room.id,
             code=room.code,
@@ -111,7 +111,7 @@ async def join_room(
             player_count=len(all_players_out),
             created_at=room.created_at,
         )
-        return JoinRoomResponse(room=room_out, player=AnonPlayerOut.model_validate(existing), players=all_players_out)
+        return JoinRoomResponse(room=room_out, player=AnonPlayerOut.from_orm(existing), players=all_players_out)
 
     used_colors = [p.color for p in all_players]
     used_names = {p.username for p in all_players}
@@ -128,7 +128,7 @@ async def join_room(
     await db.commit()
     await db.refresh(player)
 
-    all_players_out = [AnonPlayerOut.model_validate(p) for p in all_players] + [AnonPlayerOut.model_validate(player)]
+    all_players_out = [AnonPlayerOut.from_orm(p) for p in all_players] + [AnonPlayerOut.from_orm(player)]
     room_out = RoomOut(
         id=room.id,
         code=room.code,
@@ -140,7 +140,7 @@ async def join_room(
         player_count=len(all_players_out),
         created_at=room.created_at,
     )
-    return JoinRoomResponse(room=room_out, player=AnonPlayerOut.model_validate(player), players=all_players_out)
+    return JoinRoomResponse(room=room_out, player=AnonPlayerOut.from_orm(player), players=all_players_out)
 
 
 @router.get("/rooms/{code}", response_model=JoinRoomResponse)
@@ -175,8 +175,8 @@ async def get_room(
     )
     return JoinRoomResponse(
         room=room_out,
-        player=AnonPlayerOut.model_validate(my_player),
-        players=[AnonPlayerOut.model_validate(p) for p in all_players],
+        player=AnonPlayerOut.from_orm(my_player),
+        players=[AnonPlayerOut.from_orm(p) for p in all_players],
     )
 
 

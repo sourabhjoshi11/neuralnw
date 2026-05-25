@@ -83,7 +83,7 @@ async def verify_otp_endpoint(request: Request, body: VerifyOtpRequest, db: Asyn
         if user.is_banned:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is banned")
         token = create_access_token(user.id)
-        return TokenResponse(token=token, user=UserOut.model_validate(user), is_new_user=False)
+        return TokenResponse(token=token, user=UserOut.from_orm(user), is_new_user=False)
 
     # New user — issue a short-lived pending token scoped to this phone only
     pending_token = create_access_token(
@@ -131,14 +131,14 @@ async def complete_signup(
 
     _revoke(raw_token)  # pending token is single-use
     token = create_access_token(user.id)
-    return TokenResponse(token=token, user=UserOut.model_validate(user), is_new_user=False)
+    return TokenResponse(token=token, user=UserOut.from_orm(user), is_new_user=False)
 
 
 # ─── Get current user (validate token on app start) ──────────────────────────
 
 @router.get("/me", response_model=UserOut)
 async def get_me(user: User = Depends(get_current_user)):
-    return UserOut.model_validate(user)
+    return UserOut.from_orm(user)
 
 
 # ─── Logout ───────────────────────────────────────────────────────────────────
