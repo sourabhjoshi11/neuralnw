@@ -63,7 +63,7 @@ class PunishmentVoteRequest(BaseModel):
 class ReactionRequest(BaseModel):
     emoji: str
 
-    @field_validator("emoji")
+    @validator("emoji")
     @classmethod
     def validate_emoji(cls, v: str) -> str:
         v = v.strip()
@@ -75,7 +75,7 @@ class ReactionRequest(BaseModel):
 class CustomVoteRequest(BaseModel):
     value: str
 
-    @field_validator("value")
+    @validator("value")
     @classmethod
     def validate_value(cls, v: str) -> str:
         if v not in ("yes", "no"):
@@ -86,7 +86,7 @@ class CustomVoteRequest(BaseModel):
 class CustomQuestionRequest(BaseModel):
     content: str
 
-    @field_validator("content")
+    @validator("content")
     @classmethod
     def validate_content(cls, v: str) -> str:
         v = v.strip()
@@ -100,7 +100,7 @@ class CustomQuestionRequest(BaseModel):
 class CommentRequest(BaseModel):
     text: str
 
-    @field_validator("text")
+    @validator("text")
     @classmethod
     def validate_text(cls, v: str) -> str:
         v = v.strip()
@@ -122,7 +122,8 @@ class RoomOut(BaseModel):
     player_count: int
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 class AnonPlayerOut(BaseModel):
@@ -140,7 +141,8 @@ class AnonPlayerOut(BaseModel):
     last_turn_at: datetime | None
     join_order: int
 
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 class JoinRoomResponse(BaseModel):

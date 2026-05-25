@@ -51,7 +51,9 @@ class UserOut(BaseModel):
     is_banned: bool
     created_at: datetime | None = None
 
-    model_config = {"from_attributes": True}
+    
+    class Config:
+        from_attributes = True
 
 
 class TokenResponse(BaseModel):

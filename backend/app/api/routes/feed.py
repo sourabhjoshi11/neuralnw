@@ -51,7 +51,9 @@ class FeedOut(BaseModel):
     pinned_message_id: str | None = None
     is_public: bool = False
     created_at: datetime
-    model_config = {"from_attributes": True}
+    
+    class Config:
+        from_attributes = True
 
 
 class FeedMemberOut(BaseModel):
@@ -62,7 +64,9 @@ class FeedMemberOut(BaseModel):
     is_admin: bool
     weekly_message_count: int
     week_resets_at: datetime | None
-    model_config = {"from_attributes": True}
+    
+    class Config:
+        from_attributes = True
 
 
 class PostMessageRequest(BaseModel):
@@ -103,7 +107,9 @@ class FeedMessageOut(BaseModel):
     seen_by: list = []
     created_at: datetime
     expires_at: datetime
-    model_config = {"from_attributes": True}
+    
+    class Config:
+        from_attributes = True
 
 
 class EditMessageRequest(BaseModel):
