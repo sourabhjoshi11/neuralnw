@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import { useSettingsStore } from '@/store/settingsStore';
-import { Audio } from 'expo-av';
-import type { Sound } from 'expo-av/build/Audio';
+import { Audio, Sound } from '@/utils/audioCompat';
 
 let audioPlayers: Record<string, Sound> = {};
 
