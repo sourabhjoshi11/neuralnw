@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Audio } from "expo-av";
-import type { Sound } from "expo-av/build/Audio";
+import { Audio, Sound } from "@/utils/audioCompat";
 import { Colors } from "@/constants/theme";
 
 type Props = {

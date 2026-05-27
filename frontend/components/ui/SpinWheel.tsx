@@ -9,8 +9,7 @@ import Animated, {
   Easing,
   runOnJS,
 } from "react-native-reanimated";
-import { useAudioPlayer } from 'expo-audio';
-import type { Sound } from 'expo-av/build/Audio';
+import { Audio, Sound } from '@/utils/audioCompat';
 import Svg, {
   Path,
   Circle,
