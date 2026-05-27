@@ -46,7 +46,6 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-av",
       [
         "expo-notifications",
         {
@@ -54,7 +53,8 @@
           "color": "#3b82f6"
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true
