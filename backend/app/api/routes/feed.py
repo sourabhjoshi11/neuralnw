@@ -725,6 +725,20 @@ async def upload_image(
     try:
         import httpx, uuid as _uuid
         
+        # Validate file size first (before reading)
+        MAX_SIZE = 50 * 1024 * 1024  # 50MB
+        if file.size and file.size > MAX_SIZE:
+            raise HTTPException(status_code=413, detail="File too large (max 50MB)")
+        
+        # Validate content type
+        ALLOWED_TYPES = {
+            "image/jpeg", "image/png", "image/gif", "image/webp",
+            "video/mp4", "video/quicktime", "video/webm",
+            "audio/mpeg", "audio/mp4", "audio/webm", "audio/ogg",
+        }
+        if not file.content_type or file.content_type not in ALLOWED_TYPES:
+            raise HTTPException(status_code=415, detail="Invalid file type")
+        
         logger.info(f"Upload request: code={code}, filename={file.filename}, content_type={file.content_type}")
 
         feed_result = await db.execute(select(Feed).where(Feed.code == code))
