@@ -1,5 +1,4 @@
-import { Audio } from "expo-av";
-import type { Sound } from "expo-av/build/Audio";
+import { Audio, Sound } from "@/utils/audioCompat";
 import { Platform } from "react-native";
 
 class GameSoundManager {
