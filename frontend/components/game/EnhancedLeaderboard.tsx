@@ -20,7 +20,7 @@ function RankBadge({ rank }: { rank: number }) {
 
   return (
     <LinearGradient
-      colors={colors[rank as keyof typeof colors] || ["#334155", "#1e293b"]}
+      colors={(colors[rank as keyof typeof colors] || ["#334155", "#1e293b"]) as [string, string]}
       style={{
         width: 32,
         height: 32,

@@ -70,7 +70,7 @@ export default function NameScreen() {
             paddingHorizontal: 16,
             paddingVertical: 14,
           }}
-          placeholder="e.g. Rahul Sharma"
+          placeholder="e.g. Your Name"
           placeholderTextColor={Colors.text.muted}
           value={name}
           onChangeText={setName}

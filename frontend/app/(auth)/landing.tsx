@@ -13,7 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { AnimatedWheel } from '@/components/ui/AnimatedWheel';
+import { AnimatedLogo } from '@/components/ui/AnimatedLogo';
 import { Colors, SpringConfig } from '@/constants/theme';
 import { Haptics, shareText, copyToClipboard } from '@/utils/compat';
 
@@ -219,7 +219,7 @@ export default function LandingScreen() {
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 28, paddingHorizontal: 28 }}>
         {/* Wheel */}
         <Animated.View style={wheelStyle}>
-          <AnimatedWheel size={220} duration={9000} />
+          <AnimatedLogo size={200} />
         </Animated.View>
 
         {/* Wordmark */}

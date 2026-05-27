@@ -14,11 +14,12 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useAuthStore } from '@/store/authStore';
 import { Colors } from '@/constants/theme';
-import { Haptics } from '@/utils/compat';
+import { Haptics, shareText } from '@/utils/compat';
+import { playSound, initGameSounds } from '@/utils/gameSound';
 
-const API_URL    = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
-const WS_URL     = process.env.EXPO_PUBLIC_WS_URL  ?? 'wss://api.classchaos.app';
-const PING_MS    = 25_000;
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
+const WS_URL = process.env.EXPO_PUBLIC_WS_URL ?? 'wss://api.classchaos.app';
+const PING_MS = 25_000;
 const HEADER_TOP_PADDING = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 10 : 12;
 
 async function readJson(res: Response) {
@@ -75,6 +76,7 @@ interface ChatMessage {
   username: string;
   color: string;
   text: string;
+  timestamp: number;
 }
 
 interface GuessPreview {
@@ -83,40 +85,65 @@ interface GuessPreview {
   guessShurtaId: string | null;
 }
 
+interface DiscussionPhaseProps {
+  state: GameState;
+  myPlayerId: string | null;
+  myRole: Role;
+  chatMsgs: ChatMessage[];
+  typingUsers: string[];
+  chatText: string;
+  setChatText: (v: string) => void;
+  sendChat: () => void;
+  sendTyping: () => void;
+  scrollRef: React.RefObject<ScrollView | null>;
+  selectedHarami: string | null;
+  setSelectedHarami: (v: string | null) => void;
+  selectedShurta: string | null;
+  setSelectedShurta: (v: string | null) => void;
+  guessPreview: GuessPreview | null;
+  sendGuessPreview: (haramiId: string | null, shurtaId: string | null) => void;
+  countdown: number;
+  onGuess: () => void;
+  guessing: boolean;
+  isAtChatBottom: boolean;
+  setIsAtChatBottom: (v: boolean) => void;
+}
+
 const ROLE_INFO: Record<string, { emoji: string; label: string; color: string; desc: string }> = {
-  malik:   { emoji: '👑', label: 'Malik',   color: '#f59e0b', desc: 'You are revealed. Sit back and watch!' },
+  malik: { emoji: '👑', label: 'Malik', color: '#f59e0b', desc: 'You are revealed. Sit back and watch!' },
   wazir: { emoji: '🧾', label: 'Wazir', color: '#8b5cf6', desc: 'Find the Harami! Observe everyone carefully.' },
   shurta: { emoji: '👮', label: 'Shurta', color: '#3b82f6', desc: 'Help Wazir catch the Harami!' },
-  harami:   { emoji: '🕵️', label: 'Harami',   color: '#ef4444', desc: 'Stay hidden. Fool the Wazir!' },
+  harami: { emoji: '🕵️', label: 'Harami', color: '#ef4444', desc: 'Stay hidden. Fool the Wazir!' },
 };
 
 const ROLE_ORDER = ['malik', 'wazir', 'shurta', 'harami'] as const;
 
-// ─── Countdown hook ───────────────────────────────────────────────────────────
+// ─── Countdown hook (fixed: uses ref to avoid effect re-creation) ─────────────
 
 function useCountdown(phaseEndsAt: string | null): number {
   const [secs, setSecs] = useState(0);
-  const [lastSec, setLastSec] = useState(0);
-  
+  const lastSecRef = useRef(0);
+
   useEffect(() => {
     if (!phaseEndsAt) { setSecs(0); return; }
     const tick = () => {
       const diff = Math.max(0, Math.ceil((new Date(phaseEndsAt).getTime() - Date.now()) / 1000));
       setSecs(diff);
-      
-      // Play tick sound when < 6 seconds
-      if (diff <= 5 && diff > 0 && diff !== lastSec) {
-        const { playSound } = require('@/utils/gameSound');
+      if (diff <= 5 && diff > 0 && diff !== lastSecRef.current) {
         playSound('tick');
-        setLastSec(diff);
+        lastSecRef.current = diff;
       }
     };
     tick();
     const iv = setInterval(tick, 500);
     return () => clearInterval(iv);
-  }, [phaseEndsAt, lastSec]);
+  }, [phaseEndsAt]);
+
   return secs;
 }
+
+
+// ─── Animated helpers ─────────────────────────────────────────────────────────
 
 function RoleSignalBackdrop({ color = Colors.purple }: { color?: string }) {
   const sweep = useSharedValue(0);
@@ -221,13 +248,13 @@ function HiddenRoleCircle({ players }: { players: CSPlayer[] }) {
       </View>
       {visible.map((p, i) => {
         const angle = (Math.PI * 2 * i) / Math.max(visible.length, 1) - Math.PI / 2;
-        const left = 108 + Math.cos(angle) * 90;
-        const top = 74 + Math.sin(angle) * 62;
+        const cx = 108 + Math.cos(angle) * 90;
+        const cy = 74 + Math.sin(angle) * 62;
         return (
           <Animated.View
             key={p.id}
             entering={ZoomIn.delay(i * 120).springify()}
-            style={{ position: 'absolute', left, top, width: 44, height: 54, alignItems: 'center' }}
+            style={{ position: 'absolute', left: cx, top: cy, width: 44, height: 54, alignItems: 'center' }}
           >
             <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: p.color + '30', borderWidth: 1.5, borderColor: p.color, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ fontSize: 22 }}>?</Text>
@@ -245,6 +272,7 @@ function HiddenRoleCircle({ players }: { players: CSPlayer[] }) {
   );
 }
 
+
 function DraggablePlayer({
   player, assignedRole, onDragStart, onDragEnd, disabled,
 }: {
@@ -257,12 +285,14 @@ function DraggablePlayer({
   const scale = useSharedValue(1);
   const isDragging = useSharedValue(false);
 
+  const doHaptic = useCallback(() => Haptics.longPress(), []);
+
   const gesture = Gesture.Pan()
     .enabled(!disabled)
     .onStart(() => {
       isDragging.value = true;
       scale.value = withSpring(1.3);
-      runOnJS(Haptics.longPress)();
+      runOnJS(doHaptic)();
       runOnJS(onDragStart)();
     })
     .onUpdate((e) => {
@@ -290,43 +320,24 @@ function DraggablePlayer({
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={[{ alignItems: 'center', gap: 6, padding: 8 }, animStyle]}>
-        <View style={{ 
-          width: 64, height: 64, borderRadius: 32, 
-          backgroundColor: player.color + '33', 
-          borderWidth: 2.5, 
-          borderColor: assignedRole === 'harami' ? Colors.red : assignedRole === 'shurta' ? Colors.blue : player.color, 
+        <View style={{
+          width: 64, height: 64, borderRadius: 32,
+          backgroundColor: player.color + '33',
+          borderWidth: 2.5,
+          borderColor: assignedRole === 'harami' ? Colors.red : assignedRole === 'shurta' ? Colors.blue : player.color,
           alignItems: 'center', justifyContent: 'center',
-          shadowColor: player.color,
-          shadowOpacity: 0.4,
-          shadowRadius: 8,
-          elevation: 4,
+          shadowColor: player.color, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
         }}>
           <Text style={{ fontSize: 24, fontFamily: 'Poppins_700Bold', color: player.color }}>
             {player.username[0]?.toUpperCase()}
           </Text>
         </View>
-        <Text style={{ 
-          fontSize: 12, 
-          fontFamily: 'Poppins_600SemiBold', 
-          color: Colors.text.primary,
-          maxWidth: 80,
-          textAlign: 'center',
-        }} numberOfLines={1}>
+        <Text style={{ fontSize: 12, fontFamily: 'Poppins_600SemiBold', color: Colors.text.primary, maxWidth: 80, textAlign: 'center' }} numberOfLines={1}>
           {player.username}
         </Text>
         {assignedRole && (
-          <View style={{ 
-            backgroundColor: assignedRole === 'harami' ? Colors.red + '22' : Colors.blue + '22',
-            borderRadius: 8, 
-            paddingHorizontal: 6, 
-            paddingVertical: 2,
-          }}>
-            <Text style={{ 
-              fontSize: 9, 
-              fontFamily: 'Poppins_700Bold', 
-              color: assignedRole === 'harami' ? Colors.red : Colors.blue,
-              textTransform: 'uppercase',
-            }}>
+          <View style={{ backgroundColor: assignedRole === 'harami' ? Colors.red + '22' : Colors.blue + '22', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+            <Text style={{ fontSize: 9, fontFamily: 'Poppins_700Bold', color: assignedRole === 'harami' ? Colors.red : Colors.blue, textTransform: 'uppercase' }}>
               {assignedRole}
             </Text>
           </View>
@@ -359,14 +370,11 @@ function DropSpot({
     dropScale.value = withSpring(player ? 1 : 0, { damping: 12, stiffness: 180 });
   }, [player]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      viewRef.current?.measureInWindow((x, y, width, height) => {
-        onLayout?.({ x, y, width, height });
-      });
-    }, 100);
-    return () => clearInterval(timer);
-  }, []);
+  const handleLayout = useCallback(() => {
+    viewRef.current?.measureInWindow((x, y, width, height) => {
+      onLayout?.({ x, y, width, height });
+    });
+  }, [onLayout]);
 
   const pulseStyle = useAnimatedStyle(() => ({
     borderColor: active && !player
@@ -381,12 +389,12 @@ function DropSpot({
   }));
 
   return (
-    <View ref={viewRef} style={{ flex: 1, minHeight: 140 }}>
+    <View ref={viewRef} onLayout={handleLayout} style={{ flex: 1, minHeight: 140 }}>
       <Animated.View
         style={[{
           flex: 1, borderRadius: 16, padding: 16, gap: 10,
           backgroundColor: player ? color + '18' : Colors.bg.primary,
-          borderWidth: active && !player ? 3 : 1.5, 
+          borderWidth: active && !player ? 3 : 1.5,
           borderStyle: player ? 'solid' : 'dashed',
           shadowColor: active && !player ? color : 'transparent',
           shadowOpacity: active && !player ? 0.5 : 0,
@@ -427,6 +435,7 @@ function DropSpot({
   );
 }
 
+
 function ResultScene({ haramiCaught }: { haramiCaught: boolean }) {
   const chase = useSharedValue(0);
   const pop = useSharedValue(0);
@@ -466,6 +475,7 @@ function ResultScene({ haramiCaught }: { haramiCaught: boolean }) {
   );
 }
 
+
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function ChorSipahiGame() {
@@ -478,8 +488,8 @@ export default function ChorSipahiGame() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [guessing, setGuessing] = useState(false);
-  const [selectedChor, setSelectedChor] = useState<string | null>(null);
-  const [selectedSipahi, setSelectedSipahi] = useState<string | null>(null);
+  const [selectedHarami, setSelectedHarami] = useState<string | null>(null);
+  const [selectedShurta, setSelectedShurta] = useState<string | null>(null);
   const [chatText, setChatText] = useState('');
   const [chatMsgs, setChatMsgs] = useState<ChatMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
@@ -488,25 +498,26 @@ export default function ChorSipahiGame() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
 
-  const wsRef    = useRef<WebSocket | null>(null);
-  const pingRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const typingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   const countdown = useCountdown(state?.phaseEndsAt ?? null);
-  const myPlayer  = state?.players.find((p) => p.id === myPlayerId) ?? null;
-  const myRole    = myPlayer?.role ?? null;
+  const myPlayer = state?.players.find((p) => p.id === myPlayerId) ?? null;
+  const myRole = myPlayer?.role ?? null;
 
+  // Reset selections on round/phase change
   useEffect(() => {
-    setSelectedChor(null);
-    setSelectedSipahi(null);
+    setSelectedHarami(null);
+    setSelectedShurta(null);
     setGuessPreview(null);
   }, [state?.currentRound]);
 
   useEffect(() => {
     if (state?.phase !== 'guessing') {
-      setSelectedChor(null);
-      setSelectedSipahi(null);
+      setSelectedHarami(null);
+      setSelectedShurta(null);
       setGuessPreview(null);
     }
   }, [state?.phase]);
@@ -516,9 +527,7 @@ export default function ChorSipahiGame() {
     if (!token || !code) return;
     (async () => {
       try {
-        const { initGameSounds } = await import('@/utils/gameSound');
         await initGameSounds();
-        
         const res = await fetch(`${API_URL}/cs/rooms/${code}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -552,7 +561,7 @@ export default function ChorSipahiGame() {
       ws.onopen = () => {
         setWsConnected(true);
         pingRef.current = setInterval(() => {
-          ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: 'ping' }));
+          if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
         }, PING_MS);
       };
 
@@ -565,32 +574,25 @@ export default function ChorSipahiGame() {
             setState(msg.data as GameState);
             if ((msg.data as GameState).phase !== 'guessing') setGuessPreview(null);
           } else if (msg.type === 'chat') {
-            setChatMsgs((prev) => [...prev.slice(-199), { id: Math.random().toString(), ...msg.data }]);
+            setChatMsgs((prev) => [...prev.slice(-199), { id: Math.random().toString(), timestamp: Date.now(), ...msg.data }]);
             setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
           } else if (msg.type === 'typing') {
-            const name = msg.data.username;
+            const name = msg.data.username as string;
             setTypingUsers((prev) => [...new Set([...prev, name])]);
             setTimeout(() => setTypingUsers((prev) => prev.filter((u) => u !== name)), 2500);
           } else if (msg.type === 'guess_preview') {
             setGuessPreview(msg.data as GuessPreview);
-          } else if (msg.type === 'reaction') {
-            // Could add floating reactions — skip for now
           }
-        } catch { /* ignore */ }
+        } catch { /* ignore malformed */ }
       };
 
-      ws.onerror = () => {
-        setWsConnected(false);
-      };
+      ws.onerror = () => { setWsConnected(false); };
 
       ws.onclose = () => {
         setWsConnected(false);
         if (pingRef.current) clearInterval(pingRef.current);
         wsRef.current = null;
-        // Auto-reconnect after 3 seconds
-        if (alive) {
-          reconnectTimer = setTimeout(connect, 3000);
-        }
+        if (alive) reconnectTimer = setTimeout(connect, 3000);
       };
     }
 
@@ -606,6 +608,13 @@ export default function ChorSipahiGame() {
     };
   }, [loading, code, token]);
 
+  // Cleanup typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingRef.current) clearTimeout(typingRef.current);
+    };
+  }, []);
+
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleStart = async () => {
     if (starting || !token) return;
@@ -615,7 +624,7 @@ export default function ChorSipahiGame() {
         method: 'POST', headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
-        const d = await readJson(res) as any;
+        const d = await readJson(res) as { detail?: string };
         Alert.alert('Cannot start', d.detail ?? 'Error');
       }
     } catch { Alert.alert('Error', 'Could not start game'); }
@@ -623,17 +632,17 @@ export default function ChorSipahiGame() {
   };
 
   const handleGuess = async () => {
-    if (!selectedChor || !selectedSipahi || guessing || !token) return;
-    if (selectedChor === selectedSipahi) { Alert.alert('Invalid', 'Chor and Sipahi must be different players'); return; }
+    if (!selectedHarami || !selectedShurta || guessing || !token) return;
+    if (selectedHarami === selectedShurta) { Alert.alert('Invalid', 'Harami and Shurta must be different players'); return; }
     setGuessing(true);
     try {
       const res = await fetch(`${API_URL}/cs/rooms/${code}/guess`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guess_chor_id: selectedChor, guess_sipahi_id: selectedSipahi }),
+        body: JSON.stringify({ guess_chor_id: selectedHarami, guess_sipahi_id: selectedShurta }),
       });
       if (!res.ok) {
-        const d = await readJson(res) as any;
+        const d = await readJson(res) as { detail?: string };
         Alert.alert('Error', d.detail ?? 'Could not submit guess');
       }
     } catch { Alert.alert('Error', 'Network error'); }
@@ -647,12 +656,11 @@ export default function ChorSipahiGame() {
     });
   };
 
-  const sendGuessPreview = useCallback((guessChorId: string | null, guessSipahiId: string | null) => {
+  const sendGuessPreview = useCallback((guessHaramiId: string | null, guessShurtaId: string | null) => {
     if (!myPlayerId) return;
-    const preview = { mantriId: myPlayerId, guessChorId, guessSipahiId };
-    setGuessPreview(preview);
+    setGuessPreview({ wazirId: myPlayerId, guessHaramiId, guessShurtaId });
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'guess_preview', guessChorId, guessSipahiId }));
+      wsRef.current.send(JSON.stringify({ type: 'guess_preview', guessHaramiId, guessShurtaId }));
     }
   }, [myPlayerId]);
 
@@ -680,8 +688,6 @@ export default function ChorSipahiGame() {
     );
   }
 
-  // ── Phase renders ─────────────────────────────────────────────────────────
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg.primary }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -694,9 +700,7 @@ export default function ChorSipahiGame() {
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={{ fontSize: 16, fontFamily: 'Poppins_700Bold', color: Colors.text.primary }}>Harami vs Shurta</Text>
-              {!wsConnected && (
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.red }} />
-              )}
+              {!wsConnected && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.red }} />}
             </View>
             <Text style={{ fontSize: 12, fontFamily: 'Poppins_400Regular', color: Colors.text.muted }}>
               #{code} · Round {state.currentRound || '–'}
@@ -706,22 +710,18 @@ export default function ChorSipahiGame() {
             <Ionicons name="help-circle-outline" size={20} color={Colors.cyan} />
           </Pressable>
           {countdown > 0 && (
-            <Animated.View 
+            <Animated.View
               entering={ZoomIn.springify()}
-              style={{ 
-                backgroundColor: countdown <= 10 ? 'rgba(239,68,68,0.2)' : 'rgba(139,92,246,0.2)', 
-                borderRadius: countdown <= 10 ? 999 : 10, 
-                paddingHorizontal: countdown <= 10 ? 16 : 10, 
+              style={{
+                backgroundColor: countdown <= 10 ? 'rgba(239,68,68,0.2)' : 'rgba(139,92,246,0.2)',
+                borderRadius: countdown <= 10 ? 999 : 10,
+                paddingHorizontal: countdown <= 10 ? 16 : 10,
                 paddingVertical: countdown <= 10 ? 10 : 4,
                 borderWidth: countdown <= 10 ? 2 : 0,
                 borderColor: countdown <= 10 ? Colors.red : 'transparent',
               }}
             >
-              <Text style={{ 
-                fontSize: countdown <= 10 ? 24 : 16, 
-                fontFamily: 'Poppins_700Bold', 
-                color: countdown <= 10 ? Colors.red : Colors.purple 
-              }}>
+              <Text style={{ fontSize: countdown <= 10 ? 24 : 16, fontFamily: 'Poppins_700Bold', color: countdown <= 10 ? Colors.red : Colors.purple }}>
                 {countdown}s
               </Text>
             </Animated.View>
@@ -730,22 +730,12 @@ export default function ChorSipahiGame() {
 
         {/* Offline banner */}
         {!wsConnected && (
-          <Animated.View 
+          <Animated.View
             entering={SlideInUp.springify()}
-            style={{ 
-              backgroundColor: '#ef4444', 
-              paddingVertical: 8, 
-              paddingHorizontal: 16,
-              flexDirection: 'row', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              gap: 8 
-            }}
+            style={{ backgroundColor: '#ef4444', paddingVertical: 8, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
             <Ionicons name="cloud-offline-outline" size={16} color="#fff" />
-            <Text style={{ color: '#fff', fontSize: 12, fontFamily: 'Poppins_600SemiBold' }}>
-              Reconnecting...
-            </Text>
+            <Text style={{ color: '#fff', fontSize: 12, fontFamily: 'Poppins_600SemiBold' }}>Reconnecting...</Text>
           </Animated.View>
         )}
 
@@ -760,11 +750,12 @@ export default function ChorSipahiGame() {
               chatText={chatText} setChatText={setChatText}
               sendChat={sendChat} sendTyping={sendTyping}
               scrollRef={scrollRef}
-              selectedChor={selectedChor} setSelectedChor={setSelectedChor}
-              selectedSipahi={selectedSipahi} setSelectedSipahi={setSelectedSipahi}
+              selectedHarami={selectedHarami} setSelectedHarami={setSelectedHarami}
+              selectedShurta={selectedShurta} setSelectedShurta={setSelectedShurta}
               guessPreview={guessPreview} sendGuessPreview={sendGuessPreview}
               countdown={countdown}
               onGuess={handleGuess} guessing={guessing}
+              isAtChatBottom={isAtChatBottom} setIsAtChatBottom={setIsAtChatBottom}
             />
           )}
           {state.phase === 'result' && (
@@ -779,15 +770,13 @@ export default function ChorSipahiGame() {
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={{ backgroundColor: Colors.bg.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40, paddingTop: 8 }}>
                 <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 20 }} />
-                
                 <ScrollView style={{ maxHeight: 500 }} contentContainerStyle={{ paddingHorizontal: 24, gap: 20 }}>
                   <View style={{ alignItems: 'center', gap: 8 }}>
                     <Text style={{ fontSize: 24, fontFamily: 'Poppins_700Bold', color: Colors.text.primary }}>How to Play</Text>
                     <Text style={{ fontSize: 13, fontFamily: 'Poppins_400Regular', color: Colors.text.muted, textAlign: 'center' }}>
-                      4 players, 4 roles. Find the Chor before time runs out!
+                      4 players, 4 roles. Find the Harami before time runs out!
                     </Text>
                   </View>
-
                   {ROLE_ORDER.map((role) => {
                     const info = ROLE_INFO[role];
                     return (
@@ -800,19 +789,17 @@ export default function ChorSipahiGame() {
                       </View>
                     );
                   })}
-
                   <View style={{ gap: 12, padding: 16, backgroundColor: Colors.bg.primary, borderRadius: 14 }}>
                     <Text style={{ fontSize: 14, fontFamily: 'Poppins_700Bold', color: Colors.text.primary }}>Game Flow</Text>
                     <Text style={{ fontSize: 13, fontFamily: 'Poppins_400Regular', color: Colors.text.secondary, lineHeight: 20 }}>
                       1. Everyone gets a secret role{'\n'}
-                      2. Raja is revealed to all{'\n'}
+                      2. Malik is revealed to all{'\n'}
                       3. Discuss and find clues{'\n'}
-                      4. Mantri guesses Chor & Sipahi{'\n'}
-                      5. If correct, +10 points. If wrong, Chor wins!
+                      4. Wazir guesses Harami & Shurta{'\n'}
+                      5. If correct, +10 points. If wrong, Harami wins!
                     </Text>
                   </View>
                 </ScrollView>
-
                 <Pressable onPress={() => setShowTutorial(false)} style={{ marginHorizontal: 24, marginTop: 16, backgroundColor: Colors.purple, borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}>
                   <Text style={{ fontSize: 15, fontFamily: 'Poppins_700Bold', color: '#fff' }}>Got it!</Text>
                 </Pressable>
@@ -826,6 +813,7 @@ export default function ChorSipahiGame() {
   );
 }
 
+
 // ─── Lobby ────────────────────────────────────────────────────────────────────
 
 function LobbyPhase({ state, myPlayerId, isHost, onStart, starting }: {
@@ -838,6 +826,13 @@ function LobbyPhase({ state, myPlayerId, isHost, onStart, starting }: {
         <Text style={{ fontSize: 56 }}>🎭</Text>
         <Text style={{ fontSize: 20, fontFamily: 'Poppins_700Bold', color: Colors.text.primary }}>Waiting for players</Text>
         <Text style={{ fontSize: 14, fontFamily: 'Poppins_400Regular', color: Colors.text.muted }}>Need 4 players to start</Text>
+        <Pressable
+          onPress={() => shareText(`Join my Harami vs Shurta game! 🎭\n\nCode: ${state.roomCode}\n\nOpen: classchaos://join/game/${state.roomCode}`)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(139,92,246,0.15)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, marginTop: 4, borderWidth: 1, borderColor: 'rgba(139,92,246,0.3)' }}
+        >
+          <Ionicons name="share-outline" size={16} color={Colors.purple} />
+          <Text style={{ color: Colors.purple, fontSize: 13, fontFamily: 'Poppins_600SemiBold' }}>Invite Friends · {state.roomCode}</Text>
+        </Pressable>
         <RoleTicker />
       </View>
 
@@ -886,7 +881,7 @@ function RoleRevealPhase({ state, myRole, countdown }: { state: GameState; myRol
   const scale = useSharedValue(0);
   const pulse = useSharedValue(0);
   const tilt = useSharedValue(-8);
-  const info  = myRole ? ROLE_INFO[myRole] : null;
+  const info = myRole ? ROLE_INFO[myRole] : null;
 
   useEffect(() => {
     scale.value = withSpring(1, { damping: 12, stiffness: 180 });
@@ -895,9 +890,6 @@ function RoleRevealPhase({ state, myRole, countdown }: { state: GameState; myRol
       withTiming(6, { duration: 420 }),
       withSpring(0, { damping: 8, stiffness: 120 }),
     );
-    
-    // Play reveal sound
-    const { playSound } = require('@/utils/gameSound');
     playSound('reveal');
   }, []);
 
@@ -922,10 +914,7 @@ function RoleRevealPhase({ state, myRole, countdown }: { state: GameState; myRol
         backgroundColor: info ? info.color + '22' : Colors.bg.card,
         borderWidth: 3, borderColor: info?.color ?? Colors.border,
         alignItems: 'center', justifyContent: 'center',
-        shadowColor: info?.color ?? Colors.purple,
-        shadowOpacity: 0.45,
-        shadowRadius: 18,
-        elevation: 10,
+        shadowColor: info?.color ?? Colors.purple, shadowOpacity: 0.45, shadowRadius: 18, elevation: 10,
       }]}>
         <Text style={{ fontSize: 58 }}>{info?.emoji ?? '❓'}</Text>
       </Animated.View>
@@ -942,48 +931,44 @@ function RoleRevealPhase({ state, myRole, countdown }: { state: GameState; myRol
   );
 }
 
+
 // ─── Discussion + Guessing ───────────────────────────────────────────────────
 
 function DiscussionPhase({
   state, myPlayerId, myRole,
   chatMsgs, typingUsers, chatText, setChatText, sendChat, sendTyping, scrollRef,
-  selectedChor, setSelectedChor, selectedSipahi, setSelectedSipahi,
+  selectedHarami, setSelectedHarami, selectedShurta, setSelectedShurta,
   guessPreview, sendGuessPreview,
-  countdown,
-  onGuess, guessing,
-}: any) {
+  countdown, onGuess, guessing, isAtChatBottom, setIsAtChatBottom,
+}: DiscussionPhaseProps) {
   const isWazir = myRole === 'wazir';
   const isGuessing = state.phase === 'guessing';
-  const malik = state.players.find((p: CSPlayer) => p.role === 'malik');
-  const wazir = state.players.find((p: CSPlayer) => p.role === 'wazir') ?? state.players.find((p: CSPlayer) => p.id === state.round?.wazirId);
-  const activeHaramiId = isWazir ? selectedChor : guessPreview?.guessHaramiId;
-  const activeShurtaId = isWazir ? selectedSipahi : guessPreview?.guessShurtaId;
-  const suspects = state.players.filter((p: CSPlayer) => p.id !== malik?.id && p.id !== wazir?.id);
-  const selectedHaramiPlayer = state.players.find((p: CSPlayer) => p.id === activeHaramiId);
-  const selectedShurtaPlayer = state.players.find((p: CSPlayer) => p.id === activeShurtaId);
+  const malik = state.players.find((p) => p.role === 'malik');
+  const wazir = state.players.find((p) => p.role === 'wazir') ?? state.players.find((p) => p.id === state.round?.wazirId);
+  const activeHaramiId = isWazir ? selectedHarami : guessPreview?.guessHaramiId;
+  const activeShurtaId = isWazir ? selectedShurta : guessPreview?.guessShurtaId;
+  const suspects = state.players.filter((p) => p.id !== malik?.id && p.id !== wazir?.id);
+  const selectedHaramiPlayer = state.players.find((p) => p.id === activeHaramiId);
+  const selectedShurtaPlayer = state.players.find((p) => p.id === activeShurtaId);
   const [heldPlayerId, setHeldPlayerId] = useState<string | null>(null);
-  const [chorZone, setChorZone] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  const [sipahiZone, setSipahiZone] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [haramiZone, setHaramiZone] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [shurtaZone, setShurtaZone] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const bannerPulse = useSharedValue(0);
-  const dropZoneRef = useRef<View>(null);
 
-  const checkDrop = (x: number, y: number, playerId: string) => {
+  const checkDrop = useCallback((x: number, y: number, playerId: string) => {
     let dropped = false;
-    if (chorZone && x >= chorZone.x && x <= chorZone.x + chorZone.width && y >= chorZone.y && y <= chorZone.y + chorZone.height) {
+    if (haramiZone && x >= haramiZone.x && x <= haramiZone.x + haramiZone.width && y >= haramiZone.y && y <= haramiZone.y + haramiZone.height) {
       pickHarami(playerId);
       Haptics.medium();
       dropped = true;
-    } else if (sipahiZone && x >= sipahiZone.x && x <= sipahiZone.x + sipahiZone.width && y >= sipahiZone.y && y <= sipahiZone.y + sipahiZone.height) {
+    } else if (shurtaZone && x >= shurtaZone.x && x <= shurtaZone.x + shurtaZone.width && y >= shurtaZone.y && y <= shurtaZone.y + shurtaZone.height) {
       pickShurta(playerId);
       Haptics.medium();
       dropped = true;
     }
-    
-    if (!dropped) {
-      Haptics.light();
-    }
+    if (!dropped) Haptics.light();
     setHeldPlayerId(null);
-  };
+  }, [haramiZone, shurtaZone, selectedHarami, selectedShurta]);
 
   useEffect(() => {
     bannerPulse.value = withRepeat(withTiming(1, { duration: 900 }), -1, true);
@@ -995,22 +980,25 @@ function DiscussionPhase({
       ? `rgba(139,92,246,${interpolate(bannerPulse.value, [0, 1], [0.28, 0.7])})`
       : 'rgba(6,182,212,0.24)',
   }));
+
   const pickHarami = (id: string) => {
     Haptics.light();
-    const nextHarami = selectedChor === id ? null : id;
-    const nextShurta = selectedSipahi === id ? null : selectedSipahi;
-    setSelectedChor(nextHarami);
-    setSelectedSipahi(nextShurta);
-    sendGuessPreview?.(nextHarami, nextShurta);
+    const nextHarami = selectedHarami === id ? null : id;
+    const nextShurta = selectedShurta === id ? null : selectedShurta;
+    setSelectedHarami(nextHarami);
+    setSelectedShurta(nextShurta);
+    sendGuessPreview(nextHarami, nextShurta);
   };
+
   const pickShurta = (id: string) => {
     Haptics.light();
-    const nextShurta = selectedSipahi === id ? null : id;
-    const nextHarami = selectedChor === id ? null : selectedChor;
-    setSelectedSipahi(nextShurta);
-    setSelectedChor(nextHarami);
-    sendGuessPreview?.(nextHarami, nextShurta);
+    const nextShurta = selectedShurta === id ? null : id;
+    const nextHarami = selectedHarami === id ? null : selectedHarami;
+    setSelectedShurta(nextShurta);
+    setSelectedHarami(nextHarami);
+    sendGuessPreview(nextHarami, nextShurta);
   };
+
   const dropHeld = (role: 'harami' | 'shurta') => {
     if (!heldPlayerId) return;
     Haptics.medium();
@@ -1018,13 +1006,14 @@ function DiscussionPhase({
     else pickShurta(heldPlayerId);
     setHeldPlayerId(null);
   };
+
   const clearRole = (role: 'harami' | 'shurta') => {
     Haptics.light();
-    const nextHarami = role === 'harami' ? null : selectedChor;
-    const nextShurta = role === 'shurta' ? null : selectedSipahi;
-    setSelectedChor(nextHarami);
-    setSelectedSipahi(nextShurta);
-    sendGuessPreview?.(nextHarami, nextShurta);
+    const nextHarami = role === 'harami' ? null : selectedHarami;
+    const nextShurta = role === 'shurta' ? null : selectedShurta;
+    setSelectedHarami(nextHarami);
+    setSelectedShurta(nextShurta);
+    sendGuessPreview(nextHarami, nextShurta);
   };
 
   return (
@@ -1033,8 +1022,7 @@ function DiscussionPhase({
       <Animated.View entering={SlideInUp.duration(360)} style={[{
         marginHorizontal: 16, marginBottom: 8, padding: 10, borderRadius: 12,
         backgroundColor: isGuessing ? 'rgba(139,92,246,0.15)' : 'rgba(6,182,212,0.1)',
-        flexDirection: 'row', alignItems: 'center', gap: 10,
-        borderWidth: 1,
+        flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1,
       }, bannerAnim]}>
         <Text style={{ fontSize: 18 }}>{isGuessing ? '🔍' : '💬'}</Text>
         <View style={{ flex: 1 }}>
@@ -1052,7 +1040,7 @@ function DiscussionPhase({
         )}
       </Animated.View>
 
-      {/* Mantri guess UI */}
+      {/* Wazir guess UI */}
       {isGuessing && (
         <Animated.View
           entering={ZoomIn.duration(280)}
@@ -1105,26 +1093,18 @@ function DiscussionPhase({
 
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <DropSpot
-              title="Harami"
-              color={Colors.red}
-              icon="eye"
+              title="Harami" color={Colors.red} icon="eye"
               player={selectedHaramiPlayer}
-              active={isWazir && !!heldPlayerId}
-              readOnly={!isWazir}
-              onDrop={() => dropHeld('harami')}
-              onClear={() => clearRole('harami')}
-              onLayout={(layout) => setChorZone(layout)}
+              active={isWazir && !!heldPlayerId} readOnly={!isWazir}
+              onDrop={() => dropHeld('harami')} onClear={() => clearRole('harami')}
+              onLayout={(layout) => setHaramiZone(layout)}
             />
             <DropSpot
-              title="Shurta"
-              color={Colors.blue}
-              icon="shield-checkmark"
+              title="Shurta" color={Colors.blue} icon="shield-checkmark"
               player={selectedShurtaPlayer}
-              active={isWazir && !!heldPlayerId}
-              readOnly={!isWazir}
-              onDrop={() => dropHeld('shurta')}
-              onClear={() => clearRole('shurta')}
-              onLayout={(layout) => setSipahiZone(layout)}
+              active={isWazir && !!heldPlayerId} readOnly={!isWazir}
+              onDrop={() => dropHeld('shurta')} onClear={() => clearRole('shurta')}
+              onLayout={(layout) => setShurtaZone(layout)}
             />
           </View>
 
@@ -1132,20 +1112,12 @@ function DiscussionPhase({
             <Text style={{ fontSize: 11, fontFamily: 'Poppins_700Bold', color: Colors.text.muted, textTransform: 'uppercase' }}>
               {isWazir ? 'Drag players to assign roles' : 'Available suspects'}
             </Text>
-            <View style={{ 
-              flexDirection: 'row', 
-              flexWrap: 'wrap', 
-              gap: 12,
-              justifyContent: 'center',
-              paddingVertical: 8,
-            }}>
-              {suspects.map((p: CSPlayer) => {
-                const previewRole = activeHaramiId === p.id ? 'harami' : activeShurtaId === p.id ? 'shurta' : undefined;
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', paddingVertical: 8 }}>
+              {suspects.map((p) => {
+                const previewRole = activeHaramiId === p.id ? 'harami' as const : activeShurtaId === p.id ? 'shurta' as const : undefined;
                 return (
                   <DraggablePlayer
-                    key={p.id}
-                    player={p}
-                    assignedRole={previewRole}
+                    key={p.id} player={p} assignedRole={previewRole}
                     onDragStart={() => setHeldPlayerId(p.id)}
                     onDragEnd={(x, y) => checkDrop(x, y, p.id)}
                     disabled={!isWazir}
@@ -1158,21 +1130,17 @@ function DiscussionPhase({
           {isWazir ? (
             <Pressable
               onPress={onGuess}
-              disabled={!selectedChor || !selectedSipahi || guessing}
+              disabled={!selectedHarami || !selectedShurta || guessing}
               style={{
-                backgroundColor: (!selectedChor || !selectedSipahi || guessing) ? Colors.bg.primary : Colors.purple,
+                backgroundColor: (!selectedHarami || !selectedShurta || guessing) ? Colors.bg.primary : Colors.purple,
                 borderRadius: 12, paddingVertical: 14, alignItems: 'center',
-                borderWidth: 1, borderColor: (!selectedChor || !selectedSipahi || guessing) ? Colors.border : Colors.purple,
+                borderWidth: 1, borderColor: (!selectedHarami || !selectedShurta || guessing) ? Colors.border : Colors.purple,
                 flexDirection: 'row', justifyContent: 'center', gap: 8,
               }}
             >
-              <Ionicons 
-                name="checkmark-circle" 
-                size={20} 
-                color={(!selectedChor || !selectedSipahi || guessing) ? Colors.text.muted : '#fff'} 
-              />
-              <Text style={{ fontSize: 15, fontFamily: 'Poppins_700Bold', color: (!selectedChor || !selectedSipahi || guessing) ? Colors.text.muted : '#fff' }}>
-                {guessing ? 'Submitting...' : selectedChor && selectedSipahi ? 'Confirm Assignments' : 'Drag both players first'}
+              <Ionicons name="checkmark-circle" size={20} color={(!selectedHarami || !selectedShurta || guessing) ? Colors.text.muted : '#fff'} />
+              <Text style={{ fontSize: 15, fontFamily: 'Poppins_700Bold', color: (!selectedHarami || !selectedShurta || guessing) ? Colors.text.muted : '#fff' }}>
+                {guessing ? 'Submitting...' : selectedHarami && selectedShurta ? 'Confirm Assignments' : 'Drag both players first'}
               </Text>
             </Pressable>
           ) : (
@@ -1186,9 +1154,9 @@ function DiscussionPhase({
       )}
 
       {/* Chat */}
-      <ScrollView 
-        ref={scrollRef} 
-        style={{ flex: 1 }} 
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1 }}
         contentContainerStyle={{ padding: 16, gap: 8 }}
         onScroll={(e) => {
           const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -1197,7 +1165,7 @@ function DiscussionPhase({
         }}
         scrollEventThrottle={100}
       >
-        {chatMsgs.map((m: ChatMessage) => (
+        {chatMsgs.map((m) => (
           <View key={m.id} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
             <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: m.color + '33', borderWidth: 1.5, borderColor: m.color, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ fontSize: 11, fontFamily: 'Poppins_700Bold', color: m.color }}>{m.username[0]?.toUpperCase()}</Text>
@@ -1206,7 +1174,7 @@ function DiscussionPhase({
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                 <Text style={{ fontSize: 11, fontFamily: 'Poppins_600SemiBold', color: m.color }}>{m.username}</Text>
                 <Text style={{ fontSize: 9, fontFamily: 'Poppins_400Regular', color: Colors.text.muted }}>
-                  {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(m.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                 </Text>
               </View>
               <View style={{ backgroundColor: Colors.bg.card, borderRadius: 12, borderTopLeftRadius: 2, paddingHorizontal: 12, paddingVertical: 8 }}>
@@ -1217,7 +1185,7 @@ function DiscussionPhase({
         ))}
         {typingUsers.length > 0 && (
           <Text style={{ fontSize: 12, fontFamily: 'Poppins_400Regular', color: Colors.text.muted, paddingLeft: 36 }}>
-            {typingUsers.join(', ')} typing...
+            {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
           </Text>
         )}
       </ScrollView>
@@ -1226,21 +1194,7 @@ function DiscussionPhase({
       {!isAtChatBottom && (
         <Animated.View
           entering={ZoomIn.springify()}
-          style={{
-            position: 'absolute',
-            bottom: 80,
-            right: 16,
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: Colors.purple,
-            alignItems: 'center',
-            justifyContent: 'center',
-            shadowColor: Colors.purple,
-            shadowOpacity: 0.4,
-            shadowRadius: 8,
-            elevation: 4,
-          }}
+          style={{ position: 'absolute', bottom: 80, right: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.purple, alignItems: 'center', justifyContent: 'center', shadowColor: Colors.purple, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 }}
         >
           <Pressable onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}>
             <Ionicons name="arrow-down" size={20} color="#fff" />
@@ -1273,6 +1227,7 @@ function DiscussionPhase({
   );
 }
 
+
 // ─── Result ───────────────────────────────────────────────────────────────────
 
 function ResultPhase({ state, myPlayerId, isHost, onNextRound, countdown }: {
@@ -1281,13 +1236,10 @@ function ResultPhase({ state, myPlayerId, isHost, onNextRound, countdown }: {
 }) {
   const round = state.round;
   const haramiCaught = round?.haramiCaught ?? false;
-  const resultPoints = haramiCaught ? '+10' : '';
   const confetti = useSharedValue(0);
 
   useEffect(() => {
-    const { playSound } = require('@/utils/gameSound');
     playSound(haramiCaught ? 'correct' : 'wrong');
-    
     if (haramiCaught) {
       confetti.value = withRepeat(withSequence(
         withTiming(1, { duration: 300 }),
@@ -1303,38 +1255,33 @@ function ResultPhase({ state, myPlayerId, isHost, onNextRound, countdown }: {
 
   return (
     <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
-
-      {/* Confetti overlay */}
       {haramiCaught && (
         <Animated.View style={[{ position: 'absolute', top: 20, left: 0, right: 0, alignItems: 'center', zIndex: 10 }, confettiStyle]}>
           <Text style={{ fontSize: 80 }}>🎉</Text>
         </Animated.View>
       )}
 
-      {/* Result banner */}
       <Animated.View entering={FadeIn.duration(400)} style={{
         backgroundColor: haramiCaught ? 'rgba(59,130,246,0.15)' : 'rgba(239,68,68,0.15)',
         borderRadius: 20, padding: 24, alignItems: 'center', gap: 8,
-        borderWidth: 1, borderColor: haramiCaught ? Colors.blue : Colors.red,
-        overflow: 'hidden',
+        borderWidth: 1, borderColor: haramiCaught ? Colors.blue : Colors.red, overflow: 'hidden',
       }}>
         <ResultScene haramiCaught={haramiCaught} />
         <Text style={{ fontSize: 22, fontFamily: 'Poppins_700Bold', color: haramiCaught ? Colors.blue : Colors.red }}>
-          {haramiCaught ? `HARAMI CAUGHT ${resultPoints}` : 'Wrong suspect!'}
+          {haramiCaught ? 'HARAMI CAUGHT! +10' : 'Wrong suspect!'}
         </Text>
         <Text style={{ fontSize: 14, fontFamily: 'Poppins_400Regular', color: Colors.text.secondary, textAlign: 'center' }}>
           {haramiCaught ? 'Red mask revealed. Police locked the round.' : 'Harami laughed and slipped away.'}
         </Text>
       </Animated.View>
 
-      {/* Players with roles + points */}
       <Text style={{ fontSize: 13, fontFamily: 'Poppins_600SemiBold', color: Colors.text.secondary, textTransform: 'uppercase', letterSpacing: 1 }}>Roles Revealed</Text>
       <View style={{ backgroundColor: Colors.bg.card, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}>
-        {state.players
+        {[...state.players]
           .sort((a, b) => b.points - a.points)
           .map((p, i) => {
             const info = p.role ? ROLE_INFO[p.role] : null;
-            const pts  = round?.pointsAwarded?.[p.id] ?? 0;
+            const pts = round?.pointsAwarded?.[p.id] ?? 0;
             return (
               <Animated.View
                 key={p.id}
@@ -1361,7 +1308,6 @@ function ResultPhase({ state, myPlayerId, isHost, onNextRound, countdown }: {
           })}
       </View>
 
-      {/* Next round */}
       {isHost ? (
         <Pressable
           onPress={onNextRound}
@@ -1385,9 +1331,9 @@ function ResultPhase({ state, myPlayerId, isHost, onNextRound, countdown }: {
 // ─── Finished ─────────────────────────────────────────────────────────────────
 
 function FinishedPhase({ state, myPlayerId }: { state: GameState; myPlayerId: string | null }) {
-  const sorted  = [...state.players].sort((a, b) => b.points - a.points);
-  const winner  = sorted[0];
-  const medals  = ['🥇', '🥈', '🥉'];
+  const sorted = [...state.players].sort((a, b) => b.points - a.points);
+  const winner = sorted[0];
+  const medals = ['🥇', '🥈', '🥉'];
 
   return (
     <ScrollView contentContainerStyle={{ padding: 24, gap: 20, alignItems: 'center' }}>

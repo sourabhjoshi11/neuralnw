@@ -370,7 +370,7 @@ const LobbyView = memo(function LobbyView({
   const sorted = useSortedPlayersByJoinOrder(players);
 
   const handleCopy = async () => {
-    await copyToClipboard(room.code);
+    await shareText(`Join my ClassChaos game!\n\nCode: ${room.code}\n\nOpen: classchaos://join/game/${room.code}`);
     Haptics.success();
   };
 

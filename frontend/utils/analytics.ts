@@ -7,7 +7,8 @@ let posthog: PostHog | null = null;
 
 export async function initAnalytics() {
   if (!POSTHOG_API_KEY) return;
-  posthog = await PostHog.initAsync(POSTHOG_API_KEY, { host: POSTHOG_HOST });
+  posthog = new PostHog(POSTHOG_API_KEY, { host: POSTHOG_HOST });
+  await posthog.ready();
 }
 
 export const analytics = {

@@ -259,6 +259,14 @@ export default function SettingsScreen() {
                 right={<Ionicons name="chevron-forward" size={16} color="#ef4444" />}
               />
             </Pressable>
+            <Pressable onPress={() => router.push('/privacy')}>
+              <SettingRow
+                icon="document-text-outline"
+                label="Privacy Policy & Terms"
+                sublabel="How we handle your data"
+                right={<Ionicons name="chevron-forward" size={16} color={Colors.text.muted} />}
+              />
+            </Pressable>
           </View>
         </View>
 

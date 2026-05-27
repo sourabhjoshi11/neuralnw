@@ -193,7 +193,7 @@ function StatPill({ emoji, label }: { emoji: string; label: string }) {
 
 export default function HomeScreen() {
   // 0=header, 1=pills, 2=section title, 3-5=game cards, 6=quick action row
-  const anims = useStaggeredEntrance(7, 80);
+  const anims = useStaggeredEntrance(8, 80);
   const randomAvatar = ANON_AVATARS[Math.floor(Math.random() * ANON_AVATARS.length)];
 
   return (
@@ -284,8 +284,20 @@ export default function HomeScreen() {
           onPressSecondary={{ label: 'Join', onPress: () => router.push('/chor-sipahi/join') }}
         />
 
+        <GameCard
+          emoji="🎨"
+          title="Doodle Chaos"
+          subtitle="Draw & guess words with a secret saboteur and blind draw rounds"
+          badge="PARTY"
+          badgeColor={Colors.cyan}
+          gradientColors={['#06b6d4', '#3b82f6']}
+          animStyle={anims[6]}
+          onPress={() => router.push('/scribble/create')}
+          onPressSecondary={{ label: 'Join', onPress: () => router.push('/scribble/join') }}
+        />
+
         {/* Quick actions */}
-        <Animated.View style={[{ gap: 10 }, anims[6]]}>
+        <Animated.View style={[{ gap: 10 }, anims[7]]}>
           <Text style={{ color: Colors.text.muted, fontSize: 11, fontFamily: 'Poppins_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 }}>
             Quick Join
           </Text>
@@ -298,6 +310,7 @@ export default function HomeScreen() {
               { emoji: '🎯', label: 'Join Spin ', route: '/game/join', color: Colors.blue },
               { emoji: '📱', label: 'Join Feed', route: '/feed/join', color: Colors.cyan },
               { emoji: '👑', label: 'Join H vs S', route: '/chor-sipahi/join', color: Colors.purple },
+              { emoji: '🎨', label: 'Join Doodle', route: '/scribble/join', color: Colors.blue },
             ].map(({ emoji, label, route, color }) => (
               <Pressable
                 key={route}

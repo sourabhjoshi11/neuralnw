@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors, BorderRadius, SpringConfig } from "@/constants/theme";
 import { useAuthStore } from "@/store/authStore";
 import { useGameStore } from "@/store/gameStore";
+import { analytics } from "@/utils/analytics";
 import { mapAnyPlayer } from "@/utils/mapPlayer";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://api.classchaos.app";
@@ -76,6 +77,7 @@ export default function CreateGameScreen() {
       setRoom(data.room);
       setMyPlayer(mapAnyPlayer(data.player));
       setPlayers((data.players as Record<string, unknown>[]).map(mapAnyPlayer));
+      analytics.track('game_created', { code: data.room.code });
       router.push(`/game/${data.room.code}`);
     } catch {
       Alert.alert("Error", "Network error. Please try again.");

@@ -25,7 +25,7 @@ const MODES = [
 
 export default function CreateChorSipahiScreen() {
   const [mode, setMode] = useState<'quick' | 'classic' | 'party'>('quick');
-  const [maxPlayers, setMaxPlayers] = useState(6);
+  const [maxPlayers, setMaxPlayers] = useState(4);
   const [loading, setLoading] = useState(false);
   const { token } = useAuthStore();
 
@@ -99,23 +99,12 @@ export default function CreateChorSipahiScreen() {
           ))}
         </View>
 
-        {/* Max players */}
+        {/* Players: fixed at 4 */}
         <View style={{ gap: 8 }}>
-          <Text style={{ fontSize: 13, fontFamily: 'Poppins_600SemiBold', color: Colors.text.secondary, textTransform: 'uppercase', letterSpacing: 1 }}>Max Players</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {[4, 5, 6, 8, 10].map((n) => (
-              <Pressable
-                key={n}
-                onPress={() => setMaxPlayers(n)}
-                style={{
-                  flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
-                  backgroundColor: maxPlayers === n ? Colors.purple : Colors.bg.card,
-                  borderWidth: 1, borderColor: maxPlayers === n ? Colors.purple : Colors.border,
-                }}
-              >
-                <Text style={{ fontSize: 16, fontFamily: 'Poppins_700Bold', color: maxPlayers === n ? '#fff' : Colors.text.primary }}>{n}</Text>
-              </Pressable>
-            ))}
+          <Text style={{ fontSize: 13, fontFamily: 'Poppins_600SemiBold', color: Colors.text.secondary, textTransform: 'uppercase', letterSpacing: 1 }}>Players</Text>
+          <View style={{ backgroundColor: Colors.bg.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' }}>
+            <Text style={{ fontSize: 16, fontFamily: 'Poppins_700Bold', color: Colors.text.primary }}>4 Players (Fixed)</Text>
+            <Text style={{ fontSize: 12, fontFamily: 'Poppins_400Regular', color: Colors.text.muted, marginTop: 4 }}>Malik · Wazir · Shurta · Harami</Text>
           </View>
         </View>
 

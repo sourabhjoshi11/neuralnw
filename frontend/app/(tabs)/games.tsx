@@ -227,6 +227,22 @@ export default function GamesScreen() {
           joinRoute="/chor-sipahi/join"
           delay={220}
         />
+
+        <GameRoomCard
+          emoji="🎨"
+          title="Doodle Chaos"
+          subtitle="Draw & guess with fun words, a secret saboteur, and blind draw rounds!"
+          badge="PARTY"
+          gradient={['#06b6d4', '#3b82f6']}
+          bullets={[
+            'Fun word categories — college, hostel, Bollywood',
+            '🕵️ Sabotage Mode — one player misleads others',
+            '🙈 Blind Draw — canvas hides after 5 seconds',
+          ]}
+          createRoute="/scribble/create"
+          joinRoute="/scribble/join"
+          delay={340}
+        />
       </ScrollView>
     </SafeAreaView>
   );

@@ -31,7 +31,7 @@ def _generate_feed_code() -> str:
 
 class CreateFeedRequest(BaseModel):
     name: str
-    is_public: bool = False
+    is_public: bool = True
 
     @validator("name")
     @classmethod
@@ -174,7 +174,7 @@ async def create_feed(
         if not existing.scalar_one_or_none():
             break
 
-    feed = Feed(code=code, admin_id=user.id, name=body.name)
+    feed = Feed(code=code, admin_id=user.id, name=body.name, is_public=body.is_public)
     db.add(feed)
     await db.flush()
 
@@ -862,12 +862,14 @@ async def discover_feeds(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Browse public feeds, optionally filtered by name."""
-    from sqlalchemy import func
+    """Browse public feeds, optionally filtered by name or code."""
+    from sqlalchemy import or_
     limit = max(1, min(limit, 50))
     query = select(Feed).where(Feed.is_public == True)
     if q.strip():
-        query = query.where(Feed.name.ilike(f"%{q.strip()}%"))
+        query = query.where(
+            or_(Feed.name.ilike(f"%{q.strip()}%"), Feed.code.ilike(f"%{q.strip()}%"))
+        )
     query = query.order_by(Feed.member_count.desc()).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()

@@ -64,7 +64,7 @@ function QRModal({ code, visible, onClose }: { code: string; visible: boolean; o
                 <Text style={{ color: Colors.cyan, fontSize: 13, fontFamily: 'Poppins_600SemiBold' }}>Copy</Text>
               </Pressable>
               <Pressable
-                onPress={() => shareText(`Join my ClassChaos feed!\n\nCode: ${code}\n\nDownload ClassChaos and enter this code to join.`)}
+                onPress={() => shareText(`Join my ClassChaos feed!\n\nCode: ${code}\n\nOpen directly: classchaos://join/feed/${code}\n\nDon't have the app? Download ClassChaos!`)}
                 style={{ flex: 1, backgroundColor: Colors.cyan, borderRadius: 12, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
               >
                 <Ionicons name="share-social-outline" size={16} color="#fff" />

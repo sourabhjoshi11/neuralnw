@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors, BorderRadius, SpringConfig } from "@/constants/theme";
 import { useAuthStore } from "@/store/authStore";
 import { useFeedStore } from "@/store/feedStore";
+import { analytics } from "@/utils/analytics";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://api.classchaos.app";
 
@@ -53,6 +54,7 @@ export default function CreateFeedScreen() {
       setFeed(data.feed);
       setMyMemberId(data.member.id);
       addMyFeed(data.feed);
+      analytics.track('feed_created', { name: name.trim(), code: data.feed.code });
       router.push(`/feed/${data.feed.code}`);
     } catch {
       Alert.alert("Error", "Network error. Please try again.");

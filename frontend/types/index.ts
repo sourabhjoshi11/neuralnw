@@ -101,7 +101,7 @@ export type FeedMessage = {
   reactions: Record<string, number>;
   isPinned: boolean;
   editedAt: string | null;
-  msgType: 'text' | 'poll' | 'image' | 'voice';
+  msgType: 'text' | 'poll' | 'image' | 'voice' | 'video';
   pollOptions: string[] | null;
   pollVotes: Record<string, string[]> | null;
   mediaUrl: string | null;

@@ -16,15 +16,18 @@ import {
 } from '@expo-google-fonts/poppins';
 import * as SplashScreen from 'expo-splash-screen';
 import { useSession } from '@/hooks/useSession';
+import { useDeepLink } from '@/hooks/useDeepLink';
 import { useAuthStore } from '@/store/authStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { applyTheme, Colors } from '@/constants/theme';
+import { initAnalytics, analytics } from '@/utils/analytics';
 import * as SystemUI from 'expo-system-ui';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useSession(); // validates persisted token on start
+  useDeepLink(); // handle deep links
 
   const isLoading = useAuthStore((s) => s.isLoading);
   const theme = useSettingsStore((s) => s.theme);
@@ -47,6 +50,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (ready) {
       SplashScreen.hideAsync();
+      initAnalytics();
     }
   }, [ready]);
 
@@ -70,6 +74,7 @@ export default function RootLayout() {
         <Stack.Screen name="game" />
         <Stack.Screen name="feed" />
         <Stack.Screen name="chor-sipahi" />
+        <Stack.Screen name="scribble" />
       </Stack>
     </GestureHandlerRootView>
     </ErrorBoundary>

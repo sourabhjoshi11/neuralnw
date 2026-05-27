@@ -5,6 +5,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence, w
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, BorderRadius, SpringConfig } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
+import { analytics } from '@/utils/analytics';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
 const OTP_LENGTH = 6;
@@ -80,8 +81,11 @@ export default function OtpScreen() {
         return;
       }
       if (data.is_new_user) {
+        analytics.track('user_signup', { phone });
         router.push({ pathname: '/(auth)/name', params: { phone, token: data.token } });
       } else {
+        analytics.identify(data.user.id, { phone, name: data.user.name });
+        analytics.track('user_login', { phone });
         setUser(data.user, data.token);
         router.replace('/(tabs)/home');
       }

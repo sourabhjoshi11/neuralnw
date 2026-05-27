@@ -34,7 +34,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Haptics, copyToClipboard } from "@/utils/compat";
 import { apiFetch } from "@/utils/apiFetch";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import { Audio } from 'expo-av';
+import { analytics } from "@/utils/analytics";
+import { Audio, Video, ResizeMode } from 'expo-av';
 import type { Recording, Sound } from 'expo-av/build/Audio';
 import { useLinkPreview } from "@/hooks/useLinkPreview";
 import { TypingIndicator } from "@/components/feed/TypingIndicator";
@@ -616,11 +617,40 @@ function MessageBubble({
                     </Text>
                   </View>
                 )}
-                {renderContent(message.content)}
-                {message.editedAt && (
-                  <Text style={{ color: Colors.text.muted, fontSize: 9, fontFamily: "Poppins_400Regular", marginTop: 2 }}>
-                    (edited)
-                  </Text>
+                {message.msgType === "voice" && message.mediaUrl ? (
+                  <VoiceBubble url={message.mediaUrl} color={Colors.cyan} />
+                ) : message.msgType === "video" && message.mediaUrl ? (
+                  <View style={{ width: 220, height: 160, borderRadius: 10, overflow: 'hidden' }}>
+                    <Video
+                      source={{ uri: message.mediaUrl }}
+                      style={{ width: 220, height: 160 }}
+                      resizeMode={ResizeMode.COVER}
+                      useNativeControls
+                      isLooping={false}
+                    />
+                  </View>
+                ) : message.mediaUrl ? (
+                  <Pressable
+                    onPress={() => {
+                      const { Linking } = require("react-native");
+                      Linking.openURL(message.mediaUrl!);
+                    }}
+                  >
+                    <Image
+                      source={{ uri: message.mediaUrl }}
+                      style={{ width: 220, height: 160, borderRadius: 10 }}
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                ) : (
+                  <>
+                    {renderContent(message.content)}
+                    {message.editedAt && (
+                      <Text style={{ color: Colors.text.muted, fontSize: 9, fontFamily: "Poppins_400Regular", marginTop: 2 }}>
+                        (edited)
+                      </Text>
+                    )}
+                  </>
                 )}
               </LinearGradient>
             ) : (
@@ -670,6 +700,16 @@ function MessageBubble({
                 )}
                 {message.msgType === "voice" && message.mediaUrl ? (
                   <VoiceBubble url={message.mediaUrl} color={color} />
+                ) : message.msgType === "video" && message.mediaUrl ? (
+                  <View style={{ width: 220, height: 160, borderRadius: 10, overflow: 'hidden' }}>
+                    <Video
+                      source={{ uri: message.mediaUrl }}
+                      style={{ width: 220, height: 160 }}
+                      resizeMode={ResizeMode.COVER}
+                      useNativeControls
+                      isLooping={false}
+                    />
+                  </View>
                 ) : message.mediaUrl ? (
                   <Pressable
                     onPress={() => {
@@ -1231,6 +1271,7 @@ export default function FeedRoomScreen() {
   const [replyTo, setReplyTo] = useState<FeedMessage | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
+  const [showMediaOptions, setShowMediaOptions] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingRef = useRef<Recording | null>(null);
@@ -1467,6 +1508,12 @@ export default function FeedRoomScreen() {
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
     const isVideo = asset.type === "video" || asset.mimeType?.startsWith("video/");
+    // Size limit: 10MB images, 50MB videos
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (asset.fileSize && asset.fileSize > maxSize) {
+      Alert.alert("File too large", `Max size is ${isVideo ? "50MB" : "10MB"}. Please choose a smaller file.`);
+      return;
+    }
     const formData = new FormData();
     if (Platform.OS === "web") {
       const blob = await fetch(asset.uri).then((r) => r.blob());
@@ -2027,6 +2074,7 @@ export default function FeedRoomScreen() {
       const data = (await res.json()) as Record<string, unknown>;
       if (res.ok) {
         Haptics.messageSent();
+        analytics.track('message_sent', { feed_code: code });
         const mapped = mapMessage(data);
         seenMessageIds.current.add(mapped.id);
         store.addMessage(mapped);
@@ -2298,6 +2346,9 @@ export default function FeedRoomScreen() {
         </Pressable>
         <Pressable onPress={() => loadMessages(true)} style={{ padding: 4 }}>
           <Ionicons name="refresh" size={18} color={Colors.text.muted} />
+        </Pressable>
+        <Pressable onPress={() => router.push(`/feed/confessions?code=${code}`)} style={{ padding: 4 }}>
+          <Ionicons name="eye-off" size={18} color={Colors.text.muted} />
         </Pressable>
       </View>
 
@@ -2726,14 +2777,14 @@ export default function FeedRoomScreen() {
             gap: 6,
           }}
         >
-          {/* Weekly limit bar — temporarily disabled */}
-          {/* {store.weeklyCount > 0 && (
+          {/* Weekly limit bar */}
+          {store.weeklyCount > 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <View style={{ flex: 1, height: 3, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
                 <View
                   style={{
                     height: '100%',
-                    width: `${(store.weeklyCount / store.weeklyLimit) * 100}%`,
+                    width: `${Math.min(100, (store.weeklyCount / store.weeklyLimit) * 100)}%`,
                     backgroundColor: atLimit ? Colors.red : remainingMessages === 1 ? Colors.yellow : Colors.cyan,
                     borderRadius: 2,
                   }}
@@ -2743,7 +2794,7 @@ export default function FeedRoomScreen() {
                 {atLimit ? 'Limit reached' : `${remainingMessages} left this week`}
               </Text>
             </View>
-          )} */}
+          )}
 
           {/* Reply preview */}
           {replyTo && (
@@ -2979,16 +3030,12 @@ export default function FeedRoomScreen() {
                 alignItems: "flex-end",
                 backgroundColor: "rgba(255,255,255,0.08)",
                 borderRadius: 26,
-                borderWidth: 1,
-                borderColor: text
-                  ? "rgba(6,182,212,0.3)"
-                  : "rgba(255,255,255,0.06)",
                 paddingHorizontal: 4,
                 paddingVertical: 4,
                 minHeight: 48,
               }}
             >
-              {/* Left icons inside pill */}
+              {/* Left toggle icon */}
               {!editingMsg && (
                 <View
                   style={{
@@ -2999,7 +3046,7 @@ export default function FeedRoomScreen() {
                   }}
                 >
                   <Pressable
-                    onPress={handlePickImage}
+                    onPress={() => setShowMediaOptions(!showMediaOptions)}
                     style={{
                       width: 36,
                       height: 36,
@@ -3010,45 +3057,49 @@ export default function FeedRoomScreen() {
                     hitSlop={6}
                   >
                     <Ionicons
-                      name="image-outline"
-                      size={20}
-                      color={Colors.text.muted}
+                      name={showMediaOptions ? "close" : "add"}
+                      size={22}
+                      color={showMediaOptions ? Colors.cyan : Colors.text.muted}
                     />
                   </Pressable>
-                  <Pressable
-                    onPress={handlePickDocument}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                    hitSlop={6}
-                  >
-                    <Ionicons
-                      name="document-outline"
-                      size={20}
-                      color={Colors.text.muted}
-                    />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setShowPollModal(true)}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                    hitSlop={6}
-                  >
-                    <Ionicons
-                      name="stats-chart-outline"
-                      size={19}
-                      color={Colors.text.muted}
-                    />
-                  </Pressable>
+                  {showMediaOptions && (
+                    <>
+                      <Pressable
+                        onPress={() => { handlePickImage(); setShowMediaOptions(false); }}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        hitSlop={6}
+                      >
+                        <Ionicons
+                          name="image-outline"
+                          size={20}
+                          color={Colors.text.muted}
+                        />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => { handlePickDocument(); setShowMediaOptions(false); }}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        hitSlop={6}
+                      >
+                        <Ionicons
+                          name="document-outline"
+                          size={20}
+                          color={Colors.text.muted}
+                        />
+                      </Pressable>
+                    </>
+                  )}
                 </View>
               )}
 

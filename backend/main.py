@@ -14,8 +14,11 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.game import router as game_router
 from app.api.routes.feed import router as feed_router
 from app.api.routes.chor_sipahi import router as cs_router
+from app.api.routes.social import router as social_router
+from app.api.routes.scribble import router as scribble_router
 from app.api.websockets.game_ws import game_ws_handler
 from app.api.websockets.cs_ws import cs_ws_handler
+from app.api.websockets.scribble_ws import scribble_ws_handler
 from app.core.config import settings
 from app.db.base import AsyncSessionLocal, engine, Base
 import app.models  # noqa: F401 - ensures all models are registered with SQLAlchemy
@@ -150,6 +153,8 @@ app.include_router(auth_router)
 app.include_router(game_router)
 app.include_router(feed_router)
 app.include_router(cs_router)
+app.include_router(social_router)
+app.include_router(scribble_router)
 
 
 @app.get("/health")
@@ -167,3 +172,8 @@ async def game_ws_endpoint(ws: WebSocket, room_code: str):
 async def cs_ws_endpoint(ws: WebSocket, room_code: str):
     async with AsyncSessionLocal() as db:
         await cs_ws_handler(ws, room_code, db)
+
+
+@app.websocket("/ws/scribble/{room_code}")
+async def scribble_ws_endpoint(ws: WebSocket, room_code: str, token: str = ""):
+    await scribble_ws_handler(ws, room_code, token)
