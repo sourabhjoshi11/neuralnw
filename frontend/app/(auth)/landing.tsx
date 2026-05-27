@@ -216,19 +216,19 @@ export default function LandingScreen() {
         }}
       />
 
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 28, paddingHorizontal: 28 }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 60 }}>
         {/* Wheel */}
-        <Animated.View style={wheelStyle}>
-          <AnimatedLogo size={200} />
+        <Animated.View style={[wheelStyle, { marginBottom: 32 }]}>
+          <AnimatedLogo size={180} />
         </Animated.View>
 
         {/* Wordmark */}
-        <Animated.View style={[{ alignItems: 'center', gap: 10 }, titleStyle]}>
+        <Animated.View style={[{ alignItems: 'center', gap: 8, marginBottom: 24 }, titleStyle]}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ color: '#f1f5f9', fontSize: 46, fontFamily: 'Poppins_700Bold', letterSpacing: -1 }}>
+            <Text style={{ color: '#f1f5f9', fontSize: 42, fontFamily: 'Poppins_700Bold', letterSpacing: -1 }}>
               Class
             </Text>
-            <Text style={{ fontSize: 46, fontFamily: 'Poppins_700Bold', color: '#3b82f6', letterSpacing: -1 }}>
+            <Text style={{ fontSize: 42, fontFamily: 'Poppins_700Bold', color: '#3b82f6', letterSpacing: -1 }}>
               CHAOS
             </Text>
           </View>
@@ -245,12 +245,12 @@ export default function LandingScreen() {
         </Animated.View>
 
         {/* Social proof */}
-        <Animated.View style={proofStyle}>
+        <Animated.View style={[proofStyle, { marginBottom: 32 }]}>
           <SocialProof />
         </Animated.View>
 
         {/* CTA buttons */}
-        <Animated.View style={[{ width: '100%', gap: 12 }, buttonsStyle]}>
+        <Animated.View style={[{ width: '100%', maxWidth: 360, gap: 12 }, buttonsStyle]}>
           <PrimaryButton
             label="Get Started 🎲"
             onPress={() => router.push('/(auth)/phone')}
