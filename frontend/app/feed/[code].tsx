@@ -36,7 +36,6 @@ import { apiFetch } from "@/utils/apiFetch";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { analytics } from "@/utils/analytics";
 import { Audio, Recording, Sound } from '@/utils/audioCompat';
-import { Video, ResizeMode } from 'expo-video';
 import { useLinkPreview } from "@/hooks/useLinkPreview";
 import { TypingIndicator } from "@/components/feed/TypingIndicator";
 import { VoiceBubble } from "@/components/feed/VoiceBubble";
@@ -620,27 +619,15 @@ function MessageBubble({
                 {message.msgType === "voice" && message.mediaUrl ? (
                   <VoiceBubble url={message.mediaUrl} color={Colors.cyan} />
                 ) : message.msgType === "video" && message.mediaUrl ? (
-                  <View style={{ width: 220, height: 160, borderRadius: 10, overflow: 'hidden', backgroundColor: '#1a1a1a' }}>
-                    {(() => {
-                      try {
-                        return (
-                          <Video
-                            source={{ uri: message.mediaUrl }}
-                            style={{ width: 220, height: 160 }}
-                            resizeMode={ResizeMode.COVER}
-                            useNativeControls
-                            isLooping={false}
-                          />
-                        );
-                      } catch (e) {
-                        return (
-                          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ color: '#666', fontSize: 12 }}>Video unavailable</Text>
-                          </View>
-                        );
-                      }
-                    })()}
-                  </View>
+                  <Pressable
+                    onPress={() => {
+                      const { Linking } = require("react-native");
+                      Linking.openURL(message.mediaUrl!);
+                    }}
+                    style={{ width: 220, height: 160, borderRadius: 10, overflow: 'hidden', backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Text style={{ color: '#3b82f6', fontSize: 14 }}>📹 Tap to play video</Text>
+                  </Pressable>
                 ) : message.mediaUrl ? (
                   <Pressable
                     onPress={() => {
@@ -713,15 +700,15 @@ function MessageBubble({
                 {message.msgType === "voice" && message.mediaUrl ? (
                   <VoiceBubble url={message.mediaUrl} color={color} />
                 ) : message.msgType === "video" && message.mediaUrl ? (
-                  <View style={{ width: 220, height: 160, borderRadius: 10, overflow: 'hidden' }}>
-                    <Video
-                      source={{ uri: message.mediaUrl }}
-                      style={{ width: 220, height: 160 }}
-                      resizeMode={ResizeMode.COVER}
-                      useNativeControls
-                      isLooping={false}
-                    />
-                  </View>
+                  <Pressable
+                    onPress={() => {
+                      const { Linking } = require("react-native");
+                      Linking.openURL(message.mediaUrl!);
+                    }}
+                    style={{ width: 220, height: 160, borderRadius: 10, overflow: 'hidden', backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Text style={{ color: '#3b82f6', fontSize: 14 }}>📹 Tap to play video</Text>
+                  </Pressable>
                 ) : message.mediaUrl ? (
                   <Pressable
                     onPress={() => {
