@@ -3,6 +3,20 @@ import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-rean
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 
+// Global error handler
+if (typeof ErrorUtils !== 'undefined') {
+  const originalHandler = ErrorUtils.getGlobalHandler();
+  ErrorUtils.setGlobalHandler((error, isFatal) => {
+    console.error('Global Error:', error, 'Fatal:', isFatal);
+    if (!isFatal) {
+      // Non-fatal errors - log and continue
+      return;
+    }
+    // Fatal errors - call original handler
+    originalHandler?.(error, isFatal);
+  });
+}
+
 configureReanimatedLogger({ level: ReanimatedLogLevel.warn, strict: false });
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';

@@ -2,70 +2,45 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Colors } from '@/constants/theme';
 
-type Props = { children: React.ReactNode };
-type State = { hasError: boolean; error?: Error };
+interface Props {
+  children: React.ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error?: Error;
+}
 
 export class ErrorBoundary extends React.Component<Props, State> {
-  state: State = { hasError: false };
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[ErrorBoundary]', error, info.componentStack);
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('App Error:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: Colors.bg.primary,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 28,
-            gap: 20,
-          }}
-        >
-          <Text style={{ fontSize: 52 }}>💥</Text>
-          <Text
-            style={{
-              color: Colors.text.primary,
-              fontSize: 22,
-              fontFamily: 'Poppins_700Bold',
-              textAlign: 'center',
-            }}
-          >
-            Something crashed
+        <View style={{ flex: 1, backgroundColor: Colors.bg.primary, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Text style={{ fontSize: 48, marginBottom: 16 }}>😕</Text>
+          <Text style={{ fontSize: 18, fontFamily: 'Poppins_700Bold', color: Colors.text.primary, marginBottom: 8 }}>
+            Something went wrong
           </Text>
-          <Text
-            style={{
-              color: Colors.text.secondary,
-              fontSize: 14,
-              fontFamily: 'Poppins_400Regular',
-              textAlign: 'center',
-              lineHeight: 22,
-            }}
-          >
-            {this.state.error?.message ?? 'Unknown error'}
+          <Text style={{ fontSize: 14, color: Colors.text.muted, textAlign: 'center', marginBottom: 24 }}>
+            Don't worry, your data is safe. Try restarting the app.
           </Text>
-          <Pressable onPress={() => this.setState({ hasError: false, error: undefined })}>
-            <View
-              style={{
-                backgroundColor: Colors.blue,
-                borderRadius: 14,
-                paddingHorizontal: 28,
-                paddingVertical: 13,
-              }}
-            >
-              <Text
-                style={{ color: '#fff', fontSize: 15, fontFamily: 'Poppins_700Bold' }}
-              >
-                Try Again
-              </Text>
-            </View>
+          <Pressable
+            onPress={() => this.setState({ hasError: false })}
+            style={{ backgroundColor: Colors.purple, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+          >
+            <Text style={{ color: '#fff', fontFamily: 'Poppins_600SemiBold' }}>Try Again</Text>
           </Pressable>
         </View>
       );
