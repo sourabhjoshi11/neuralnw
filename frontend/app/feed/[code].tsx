@@ -620,14 +620,26 @@ function MessageBubble({
                 {message.msgType === "voice" && message.mediaUrl ? (
                   <VoiceBubble url={message.mediaUrl} color={Colors.cyan} />
                 ) : message.msgType === "video" && message.mediaUrl ? (
-                  <View style={{ width: 220, height: 160, borderRadius: 10, overflow: 'hidden' }}>
-                    <Video
-                      source={{ uri: message.mediaUrl }}
-                      style={{ width: 220, height: 160 }}
-                      resizeMode={ResizeMode.COVER}
-                      useNativeControls
-                      isLooping={false}
-                    />
+                  <View style={{ width: 220, height: 160, borderRadius: 10, overflow: 'hidden', backgroundColor: '#1a1a1a' }}>
+                    {(() => {
+                      try {
+                        return (
+                          <Video
+                            source={{ uri: message.mediaUrl }}
+                            style={{ width: 220, height: 160 }}
+                            resizeMode={ResizeMode.COVER}
+                            useNativeControls
+                            isLooping={false}
+                          />
+                        );
+                      } catch (e) {
+                        return (
+                          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ color: '#666', fontSize: 12 }}>Video unavailable</Text>
+                          </View>
+                        );
+                      }
+                    })()}
                   </View>
                 ) : message.mediaUrl ? (
                   <Pressable
