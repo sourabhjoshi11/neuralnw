@@ -33,9 +33,7 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "VIBRATE",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "VIBRATE"
       ],
       "jsEngine": "hermes"
     },
@@ -53,9 +51,7 @@
           "icon": "./assets/images/icon.png",
           "color": "#3b82f6"
         }
-      ],
-      "expo-audio",
-      "expo-video"
+      ]
     ],
     "experiments": {
       "typedRoutes": true
