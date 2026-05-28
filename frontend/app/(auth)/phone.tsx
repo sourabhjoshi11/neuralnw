@@ -20,19 +20,33 @@ export default function PhoneScreen() {
     if (!isValid || loading) return;
     setLoading(true);
     try {
+      console.log('Sending OTP to:', `+91${phone.replace(/\s/g, '')}`);
+      console.log('API URL:', `${API_URL}/auth/send-otp`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      
       const resp = await fetch(`${API_URL}/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: `+91${phone.replace(/\s/g, '')}` }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
+      
       const data = await resp.json();
+      console.log('Response:', resp.status, data);
+      
       if (!resp.ok) {
         Alert.alert('Error', data.detail ?? 'Failed to send OTP');
         return;
       }
       router.push({ pathname: '/(auth)/otp', params: { phone: `+91${phone.replace(/\s/g, '')}` } });
-    } catch {
-      Alert.alert('Error', 'Network error. Please check your connection.');
+    } catch (err) {
+      console.error('Network error:', err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Alert.alert('Error', `Network error: ${message}\n\nPlease check your internet connection.`);
     } finally {
       setLoading(false);
     }
