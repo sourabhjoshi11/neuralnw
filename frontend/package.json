@@ -23,7 +23,7 @@
     "babel-plugin-module-resolver": "^5.0.3",
     "babel-preset-expo": "~55.0.8",
     "expo": "~55.0.26",
-    "expo-build-properties": "^56.0.16",
+    "expo-build-properties": "~55.0.0",
     "expo-clipboard": "~55.0.13",
     "expo-constants": "~55.0.16",
     "expo-dev-client": "~55.0.35",
