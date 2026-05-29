@@ -33,8 +33,11 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "VIBRATE"
+        "VIBRATE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
       ],
+      "usesCleartextTraffic": false,
       "jsEngine": "hermes"
     },
     "web": {
