@@ -15,6 +15,7 @@
       }
     },
     "production": {
+      "node": "24.x.x",
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease",
