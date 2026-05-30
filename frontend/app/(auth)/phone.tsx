@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, BorderRadius, SpringConfig } from '@/constants/theme';
+import axios from 'axios';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.classchaos.app';
 
@@ -23,30 +24,29 @@ export default function PhoneScreen() {
       console.log('Sending OTP to:', `+91${phone.replace(/\s/g, '')}`);
       console.log('API URL:', `${API_URL}/auth/send-otp`);
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
-      
-      const resp = await fetch(`${API_URL}/auth/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: `+91${phone.replace(/\s/g, '')}` }),
-        signal: controller.signal,
+      const resp = await axios.post(`${API_URL}/auth/send-otp`, {
+        phone: `+91${phone.replace(/\s/g, '')}`
+      }, {
+        timeout: 30000,
+        headers: { 'Content-Type': 'application/json' }
       });
       
-      clearTimeout(timeoutId);
+      console.log('Response:', resp.status, resp.data);
       
-      const data = await resp.json();
-      console.log('Response:', resp.status, data);
-      
-      if (!resp.ok) {
-        Alert.alert('Error', data.detail ?? 'Failed to send OTP');
-        return;
-      }
       router.push({ pathname: '/(auth)/otp', params: { phone: `+91${phone.replace(/\s/g, '')}` } });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Network error:', err);
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      Alert.alert('Error', `Network error: ${message}\n\nPlease check your internet connection.`);
+      
+      if (err.response) {
+        // Server responded with error
+        Alert.alert('Error', err.response.data?.detail ?? 'Failed to send OTP');
+      } else if (err.request) {
+        // Request made but no response
+        Alert.alert('Error', `Network error: ${err.message}\n\nPlease check your internet connection.`);
+      } else {
+        // Something else happened
+        Alert.alert('Error', err.message);
+      }
     } finally {
       setLoading(false);
     }
